@@ -1,7 +1,3 @@
-# %% [markdown]
-# Cell 1 – Imports and basic config
-
-# %%
 #!/usr/bin/env python3
 """
 NISO – NIFTY Options Supertrend Scalper with Paper Logging (Notebook version)
@@ -18,14 +14,18 @@ import datetime as dt
 import re
 
 
-
-# %% [markdown]
-# Cell 2 – Env variables and global constants
-
-# %%
 # CONFIG & CREDENTIALS
-
-from env import UPSTOX_CLIENT_KEY, UPSTOX_CLIENT_SECRET, UPSTOX_REDIRECT_URI
+try:
+    from env import (
+        UPSTOX_CLIENT_KEY,
+        UPSTOX_CLIENT_SECRET,
+        UPSTOX_REDIRECT_URI,
+    )
+except ImportError as e:
+    raise RuntimeError(
+        "Set UPSTOX_CLIENT_KEY, UPSTOX_CLIENT_SECRET, "
+        "UPSTOX_REDIRECT_URI in env.py"
+    ) from e
 
 PAPER = True  # False = LIVE, True = paper-trade with logging
 
@@ -33,8 +33,10 @@ CLIENT_ID = UPSTOX_CLIENT_KEY
 CLIENT_SECRET = UPSTOX_CLIENT_SECRET
 REDIRECT_URI = UPSTOX_REDIRECT_URI
 
-if not CLIENT_ID or not CLIENT_SECRET or not REDIRECT_URI:
-    raise RuntimeError("Set UPSTOX_CLIENT_KEY, UPSTOX_CLIENT_SECRET, UPSTOX_REDIRECT_URI in env.py")
+if not all([CLIENT_ID, CLIENT_SECRET, REDIRECT_URI]):
+    raise RuntimeError(
+        "Missing Upstox credentials. Check env.py"
+    )
 
 ACCESS_TOKEN_FILE = "upstox_access_token.txt"
 
@@ -42,11 +44,11 @@ BASE_REST = "https://api.upstox.com/v2"
 BASE_HFT = "https://api-hft.upstox.com/v2"
 
 QTY = 750
-PRODUCT = "I"      # Intraday
+PRODUCT = "I"  # Intraday
 TAG = "niso-triple-supertrend-bot"
 
-RUPEE_TARGET = 10000      # Exit ALL when total MTM >= ₹10k
-RUPEE_SL = -3500          # Exit ALL when total MTM <= -₹3.5k (1:2.85 R:R)
+RUPEE_TARGET = 10000  # Exit ALL when total MTM >= ₹10k
+RUPEE_SL = -3500  # Exit ALL when total MTM <= -₹3.5k (1:2.85 R:R)
 
 # Paper log config
 PAPER_LOG_DIR = Path("paper_logs")
@@ -56,14 +58,13 @@ NIFTY_SPOT_INSTRUMENT = "NSE_INDEX|Nifty 50"
 UPSTOX_API_VERSION = "2.0"
 
 
-
-# %% [markdown]
-# Cell 3 – Auth helpers and headers
-
-# %%
-def get_access_token():
+def get_access_token() -> str:
+    """Get access token from file."""
     if not os.path.exists(ACCESS_TOKEN_FILE):
-        raise RuntimeError("Run your Upstox auth script once to create upstox_access_token.txt")
+        raise RuntimeError(
+            "Run your Upstox auth script once to create "
+            "upstox_access_token.txt"
+        )
     with open(ACCESS_TOKEN_FILE, "r", encoding="utf-8") as f:
         token = f.read().strip()
     if not token:
@@ -71,14 +72,16 @@ def get_access_token():
     return token
 
 
-def api_headers():
+def api_headers() -> dict[str, str]:
+    """Return REST API headers."""
     return {
         "Authorization": f"Bearer {get_access_token()}",
         "accept": "application/json",
     }
 
 
-def hft_headers():
+def hft_headers() -> dict[str, str]:
+    """Return HFT API headers."""
     return {
         "Authorization": f"Bearer {get_access_token()}",
         "accept": "application/json",
@@ -86,7 +89,8 @@ def hft_headers():
     }
 
 
-def upstox_headers():
+def upstox_headers() -> dict[str, str]:
+    """Return Upstox historical API headers."""
     return {
         "Authorization": f"Bearer {get_access_token()}",
         "Api-Version": UPSTOX_API_VERSION,
@@ -95,17 +99,12 @@ def upstox_headers():
     }
 
 
-def now_iso():
+def now_iso() -> str:
     """Current timestamp in ISO 8601 with seconds."""
     return datetime.now().isoformat(timespec="seconds")
 
 
-
-# %% [markdown]
-# Cell 4 – Logging helpers (CSV + strike / P&L)
-
-# %%
-def ensure_log_files():
+def ensure_log_files() -> tuple[Path, Path]:
     """Create paper_logs dir and CSVs with header if missing."""
     PAPER_LOG_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -117,7 +116,7 @@ def ensure_log_files():
         "side",
         "symbol",
         "instrument_key",
-        "strike",        # e.g. '26200.0 CE 2025-12-23'
+        "strike",  # e.g. '26200.0 CE 2025-12-23'
         "qty",
         "entry_price",
         "sl_price",
@@ -135,7 +134,9 @@ def ensure_log_files():
     return lifetime_file, today_file
 
 
-def get_nifty_option_contracts(expiry_date=None, verbose=True):
+def get_nifty_option_contracts(
+    expiry_date: str | None = None, verbose: bool = True
+) -> list[dict]:
     """NIFTY option contracts via option/contract endpoint."""
     params = {"instrument_key": "NSE_INDEX|Nifty 50"}
     if expiry_date:
@@ -150,10 +151,12 @@ def get_nifty_option_contracts(expiry_date=None, verbose=True):
     return j.get("data", [])
 
 
-def instrument_info_from_key(instrument_key: str, contracts=None):
+def instrument_info_from_key(
+    instrument_key: str, contracts: list[dict] | None = None
+) -> dict[str, str | float | None] | None:
     """
-    Return strike/type/expiry/trading_symbol for a numeric Upstox instrument_key
-    like 'NSE_FO|57013' by looking into option contracts list.
+    Return strike/type/expiry/trading_symbol for a numeric Upstox
+    instrument_key like 'NSE_FO|57013' by looking into option contracts list.
     """
     if contracts is None:
         try:
@@ -165,14 +168,14 @@ def instrument_info_from_key(instrument_key: str, contracts=None):
         if c.get("instrument_key") == instrument_key:
             return {
                 "strike": c.get("strike_price"),
-                "type": c.get("instrument_type"),   # CE or PE
+                "type": c.get("instrument_type"),  # CE or PE
                 "expiry": c.get("expiry"),
                 "trading_symbol": c.get("trading_symbol"),
             }
     return None
 
 
-def log_trade_row(row):
+def log_trade_row(row: list) -> None:
     """
     Append a row to lifetime + daily CSV.
 
@@ -203,11 +206,7 @@ def log_trade_row(row):
             writer.writerow(log_row)
 
 
-# %% [markdown]
-# Cell 5 – Market data: NIFTY LTP and candles
-
-# %%
-def get_nifty_ltp():
+def get_nifty_ltp() -> float:
     """NIFTY index LTP via LTP endpoint."""
     req_key = "NSE_INDEX|Nifty 50"
     url = f"{BASE_REST}/market-quote/ltp"
@@ -225,7 +224,7 @@ def get_nifty_ltp():
     return item.get("last_price") or item.get("ltp")
 
 
-def get_nifty_intraday_candles(minutes_back: int):
+def get_nifty_intraday_candles(minutes_back: int) -> pd.DataFrame:
     end_time = dt.datetime.now()
     start_time = end_time - dt.timedelta(minutes=minutes_back)
 
@@ -246,7 +245,9 @@ def get_nifty_intraday_candles(minutes_back: int):
     for c in data["data"]["candles"]:
         rows.append(
             dict(
-                time=dt.datetime.fromisoformat(c[0].replace("Z", "+00:00")),
+                time=dt.datetime.fromisoformat(
+                    c[0].replace("Z", "+00:00")
+                ),
                 open=c[1],
                 high=c[2],
                 low=c[3],
@@ -257,11 +258,9 @@ def get_nifty_intraday_candles(minutes_back: int):
     return pd.DataFrame(rows)
 
 
-# %% [markdown]
-# Cell 6 – Option contracts utilities and trend logic
-
-# %%
-def build_strike_maps(contracts):
+def build_strike_maps(
+    contracts: list[dict],
+) -> tuple[dict[float, str], dict[float, str], datetime.date | None]:
     df = pd.DataFrame(contracts)
     if df.empty:
         return {}, {}, None
@@ -274,86 +273,112 @@ def build_strike_maps(contracts):
     pe_map = dict(zip(pe_df["strike_price"], pe_df["instrument_key"]))
     return ce_map, pe_map, nearest_expiry
 
-def pick_near_atm_strikes(spot, strike_list, n=5):
+
+def pick_near_atm_strikes(
+    spot: float, strike_list: list[float], n: int = 5
+) -> list[float]:
     if not strike_list:
         return []
     sorted_strikes = sorted(strike_list, key=lambda k: abs(k - spot))
     return sorted_strikes[:n]
-# ======================================================================
-# Triple Supertrend(10,1) (11,2) (12,3) strategy utilities
-# ======================================================================
-def supertrend(df, period, multiplier, prefix):
+
+
+def supertrend(
+    df: pd.DataFrame, period: int, multiplier: float, prefix: str
+) -> pd.DataFrame:
     """
-    Generic Supertrend calculator. Adds 'st_{prefix}' and 'st_dir_{prefix}' columns.
+    Generic Supertrend calculator. Adds 'st_{prefix}' and 'st_dir_{prefix}'
+    columns.
     period: ATR window (10,11,12), multiplier: ATR multiple (1,2,3)
     """
     high, low, close = df["high"], df["low"], df["close"]
-    
+
     # True Range
     prev_close = close.shift(1)
-    tr = pd.concat([
-        high - low,
-        (high - prev_close).abs(), 
-        (low - prev_close).abs()
-    ], axis=1).max(axis=1)
-    
+    tr = pd.concat(
+        [
+            high - low,
+            (high - prev_close).abs(),
+            (low - prev_close).abs(),
+        ],
+        axis=1,
+    ).max(axis=1)
+
     # ATR
     atr = tr.rolling(window=period, min_periods=period).mean()
-    
+
     # Basic bands
     hl2 = (high + low) / 2
     upperband = hl2 + (multiplier * atr)
     lowerband = hl2 - (multiplier * atr)
-    
+
     # Final bands (ratcheting logic)
     final_upper = upperband.copy()
     final_lower = lowerband.copy()
-    
+
     for i in range(1, len(df)):
         # Upper band: can't rise after downtrend starts
-        final_upper.iloc[i] = (min(upperband.iloc[i], final_upper.iloc[i-1]) 
-                             if close.iloc[i-1] <= final_upper.iloc[i-1] 
-                             else upperband.iloc[i])
-        
-        # Lower band: can't fall after uptrend starts  
-        final_lower.iloc[i] = (max(lowerband.iloc[i], final_lower.iloc[i-1]) 
-                             if close.iloc[i-1] >= final_lower.iloc[i-1] 
-                             else lowerband.iloc[i])
-    
+        final_upper.iloc[i] = (
+            min(upperband.iloc[i], final_upper.iloc[i - 1])
+            if close.iloc[i - 1] <= final_upper.iloc[i - 1]
+            else upperband.iloc[i]
+        )
+
+        # Lower band: can't fall after uptrend starts
+        final_lower.iloc[i] = (
+            max(lowerband.iloc[i], final_lower.iloc[i - 1])
+            if close.iloc[i - 1] >= final_lower.iloc[i - 1]
+            else lowerband.iloc[i]
+        )
+
     # Supertrend line & direction
     st = pd.Series(index=df.index, dtype=float)
     direction = pd.Series(index=df.index, dtype=int)
-    
+
     for i in range(len(df)):
         if i == 0:
             st.iloc[i] = final_upper.iloc[i]
             direction.iloc[i] = -1
         else:
-            prev_st, prev_upper, prev_lower = st.iloc[i-1], final_upper.iloc[i-1], final_lower.iloc[i-1]
-            
+            prev_st = st.iloc[i - 1]
+            prev_upper = final_upper.iloc[i - 1]
+            prev_lower = final_lower.iloc[i - 1]
+
             if prev_st == prev_upper:  # Was in downtrend
                 if close.iloc[i] <= final_upper.iloc[i]:
-                    st.iloc[i], direction.iloc[i] = final_upper.iloc[i], -1
+                    st.iloc[i] = final_upper.iloc[i]
+                    direction.iloc[i] = -1
                 else:
-                    st.iloc[i], direction.iloc[i] = final_lower.iloc[i], 1
+                    st.iloc[i] = final_lower.iloc[i]
+                    direction.iloc[i] = 1
             else:  # Was in uptrend
                 if close.iloc[i] >= final_lower.iloc[i]:
-                    st.iloc[i], direction.iloc[i] = final_lower.iloc[i], 1
+                    st.iloc[i] = final_lower.iloc[i]
+                    direction.iloc[i] = 1
                 else:
-                    st.iloc[i], direction.iloc[i] = final_upper.iloc[i], -1
-    
+                    st.iloc[i] = final_upper.iloc[i]
+                    direction.iloc[i] = -1
+
     # Add to dataframe
     df[f"st_{prefix}"] = st
     df[f"st_dir_{prefix}"] = direction
     return df
 
-# Triple Supertrend factory functions
-def supertrend_10_1(df): return supertrend(df, 10, 1.0, "10_1")
-def supertrend_11_2(df): return supertrend(df, 11, 2.0, "11_2") 
-def supertrend_12_3(df): return supertrend(df, 12, 3.0, "12_3")
 
-# Triple Supertrend detect trend
-def detect_trend(df):
+# Triple Supertrend factory functions
+def supertrend_10_1(df: pd.DataFrame) -> pd.DataFrame:
+    return supertrend(df, 10, 1.0, "10_1")
+
+
+def supertrend_11_2(df: pd.DataFrame) -> pd.DataFrame:
+    return supertrend(df, 11, 2.0, "11_2")
+
+
+def supertrend_12_3(df: pd.DataFrame) -> pd.DataFrame:
+    return supertrend(df, 12, 3.0, "12_3")
+
+
+def detect_trend(df: pd.DataFrame) -> int:
     """
     Triple Supertrend FIRST ALIGNMENT detection.
     Returns 1 (first bullish), -1 (first bearish), 0 (no new signal).
@@ -362,33 +387,39 @@ def detect_trend(df):
         return 0
 
     df = supertrend_10_1(df)
-    df = supertrend_11_2(df) 
+    df = supertrend_11_2(df)
     df = supertrend_12_3(df)
-    
+
     # Latest directions
     dir_10_1 = df["st_dir_10_1"].iloc[-1]
-    dir_11_2 = df["st_dir_11_2"].iloc[-1] 
+    dir_11_2 = df["st_dir_11_2"].iloc[-1]
     dir_12_3 = df["st_dir_12_3"].iloc[-1]
-    
+
     # Check if ALL 3 aligned (current logic)
     all_bull = dir_10_1 == 1 and dir_11_2 == 1 and dir_12_3 == 1
     all_bear = dir_10_1 == -1 and dir_11_2 == -1 and dir_12_3 == -1
-    
+
     # Previous candle directions (if exists)
     if len(df) > 1:
         prev_10_1 = df["st_dir_10_1"].iloc[-2]
         prev_11_2 = df["st_dir_11_2"].iloc[-2]
         prev_12_3 = df["st_dir_12_3"].iloc[-2]
-        
+
         prev_all_bull = prev_10_1 == 1 and prev_11_2 == 1 and prev_12_3 == 1
         prev_all_bear = prev_10_1 == -1 and prev_11_2 == -1 and prev_12_3 == -1
-        
+
         # FIRST ALIGNMENT: current align + previous NOT aligned
         if all_bull and not prev_all_bull:
-            print(f"FIRST BULLISH: 10,1={dir_10_1} 11,2={dir_11_2} 12,3={dir_12_3}")
+            print(
+                f"FIRST BULLISH: 10,1={dir_10_1} 11,2={dir_11_2} "
+                f"12,3={dir_12_3}"
+            )
             return 1
         elif all_bear and not prev_all_bear:
-            print(f"FIRST BEARISH: 10,1={dir_10_1} 11,2={dir_11_2} 12,3={dir_12_3}")
+            print(
+                f"FIRST BEARISH: 10,1={dir_10_1} 11,2={dir_11_2} "
+                f"12,3={dir_12_3}"
+            )
             return -1
     else:
         # First candle ever - treat as signal
@@ -396,11 +427,20 @@ def detect_trend(df):
             return 1
         elif all_bear:
             return -1
-    
-    print(f"Triple ST aligned but not FIRST: 10,1={dir_10_1} 11,2={dir_11_2} 12,3={dir_12_3}")
+
+    print(
+        f"Triple ST aligned but not FIRST: 10,1={dir_10_1} "
+        f"11,2={dir_11_2} 12,3={dir_12_3}"
+    )
     return 0
 
-def pick_instrument_for_trend(trend, spot, ce_map, pe_map):
+
+def pick_instrument_for_trend(
+    trend: int,
+    spot: float,
+    ce_map: dict[float, str],
+    pe_map: dict[float, str],
+) -> tuple[str | None, str | None, float | None]:
     """Pick one ATM CE or PE instrument_key based on Supertrend direction."""
     if trend == 0:
         return None, None, None
@@ -410,7 +450,7 @@ def pick_instrument_for_trend(trend, spot, ce_map, pe_map):
             return None, None, None
         strike = strikes[0]
         return ce_map[strike], "CE", strike
-    else:          # bearish -> PE
+    else:  # bearish -> PE
         strikes = pick_near_atm_strikes(spot, list(pe_map.keys()), n=5)
         if not strikes:
             return None, None, None
@@ -418,8 +458,9 @@ def pick_instrument_for_trend(trend, spot, ce_map, pe_map):
         return pe_map[strike], "PE", strike
 
 
-
-def info_from_instrument_key(contracts, instrument_key: str):
+def info_from_instrument_key(
+    contracts: list[dict], instrument_key: str
+) -> dict[str, str | float | None] | None:
     """
     Given the full contracts list, return strike, type, expiry, trading_symbol.
     """
@@ -434,11 +475,7 @@ def info_from_instrument_key(contracts, instrument_key: str):
     return None
 
 
-# %% [markdown]
-# Cell 7 – Option LTP and order placement helpers
-
-# %%
-def get_option_ltp(instrument_key):
+def get_option_ltp(instrument_key: str) -> float:
     url = f"{BASE_REST}/market-quote/ltp"
     params = {"instrument_key": instrument_key}
     r = requests.get(url, headers=api_headers(), params=params)
@@ -450,7 +487,9 @@ def get_option_ltp(instrument_key):
     return item.get("last_price") or item.get("ltp")
 
 
-def place_hft_market_order(instrument_token, quantity, side):
+def place_hft_market_order(
+    instrument_token: str, quantity: int, side: str
+) -> str:
     url = f"{BASE_HFT}/order/place"
     payload = {
         "quantity": quantity,
@@ -474,7 +513,9 @@ def place_hft_market_order(instrument_token, quantity, side):
     return r.json()["data"]["order_id"]
 
 
-def place_hft_limit_order(instrument_token, quantity, side, price):
+def place_hft_limit_order(
+    instrument_token: str, quantity: int, side: str, price: float
+) -> str:
     payload = {
         "quantity": quantity,
         "product": PRODUCT,
@@ -497,7 +538,13 @@ def place_hft_limit_order(instrument_token, quantity, side, price):
     return r.json()["data"]["order_id"]
 
 
-def place_hft_sl_order(instrument_token, quantity, side, price, trigger_price):
+def place_hft_sl_order(
+    instrument_token: str,
+    quantity: int,
+    side: str,
+    price: float,
+    trigger_price: float,
+) -> str:
     payload = {
         "quantity": quantity,
         "product": PRODUCT,
@@ -519,8 +566,8 @@ def place_hft_sl_order(instrument_token, quantity, side, price, trigger_price):
     r.raise_for_status()
     return r.json()["data"]["order_id"]
 
-#check margin availability
-def get_account_margin():
+
+def get_account_margin() -> float:
     """Get available margin from Upstox profile."""
     url = f"{BASE_REST}/profile/user"
     r = requests.get(url, headers=api_headers())
@@ -528,38 +575,39 @@ def get_account_margin():
     data = r.json()["data"]
     return float(data.get("day_limit", 0))  # Available intraday margin
 
-def check_margin_for_order(instrument_key):
-    """Check if enough margin for QTY (750) of this option."""
-    margin_needed = get_option_margin_estimate(instrument_key, QTY)
-    available = get_account_margin()
-    
-    print(f"Margin check: Available ₹{available:,.0f} | Needed ₹{margin_needed:,.0f}")
-    
-    if available < margin_needed * 1.1:  # 10% buffer
-        print("❌ INSUFFICIENT MARGIN")
-        return False
-    return True
 
-def get_option_margin_estimate(instrument_key, qty):
+def get_option_margin_estimate(instrument_key: str, qty: int) -> float:
     """Rough estimate: option premium × qty × 1.5 margin."""
     ltp = get_option_ltp(instrument_key)
     return ltp * qty * 1.5  # Conservative 1.5x estimate
 
 
-# %% [markdown]
-# Cell 8 – Position class, trailing SL, monitoring, dashboard
+def check_margin_for_order(instrument_key: str) -> bool:
+    """Check if enough margin for QTY (750) of this option."""
+    margin_needed = get_option_margin_estimate(instrument_key, QTY)
+    available = get_account_margin()
 
-# %%
-open_positions = {}
+    print(f"Margin check: Available ₹{available:,.0f} | Needed ₹{margin_needed:,.0f}")
+
+    if available < margin_needed * 1.1:  # 10% buffer
+        print("❌ INSUFFICIENT MARGIN")
+        return False
+    return True
+
+
+open_positions: dict[str, "Position"] = {}
 daily_pnl = 0.0
 
+
 class Position:
-    def __init__(self, entry_oid, instrument_key, qty, entry_price):
+    def __init__(
+        self, entry_oid: str, instrument_key: str, qty: int, entry_price: float
+    ):
         self.entry_oid = entry_oid
         self.instrument_key = instrument_key
         self.qty = qty
         self.entry_price = entry_price
-        
+
         # Log entry (SL/TGT columns = 0 for portfolio exits)
         row = [
             now_iso(),
@@ -576,31 +624,43 @@ class Position:
         log_trade_row(row)
         print(f"Position opened: {self.instrument_key} @ ₹{entry_price:.2f}")
 
-def exit_all_positions(reason, final_mtm):
+
+def exit_all_positions(reason: str, final_mtm: float) -> None:
     global open_positions, daily_pnl
     for oid, pos in list(open_positions.items()):
         exit_ltp = get_option_ltp(pos.instrument_key)
         pnl = (exit_ltp - pos.entry_price) * pos.qty
         daily_pnl += pnl
-        
-        row = [now_iso(), "SELL", TAG, pos.instrument_key, pos.qty,
-               exit_ltp, 0, 0, reason, round(pnl, 2)]
+
+        row = [
+            now_iso(),
+            "SELL",
+            TAG,
+            pos.instrument_key,
+            pos.qty,
+            exit_ltp,
+            0,
+            0,
+            reason,
+            round(pnl, 2),
+        ]
         log_trade_row(row)
         del open_positions[oid]
     print(f"All positions exited: {reason} | Final MTM: ₹{final_mtm:.0f}")
 
-def monitor_positions():
+
+def monitor_positions() -> None:
     global open_positions, daily_pnl
-    
+
     # Portfolio MTM check ONLY
     total_mtm = 0.0
     for oid, pos in open_positions.items():
         ltp = get_option_ltp(pos.instrument_key)
         mtm = (ltp - pos.entry_price) * pos.qty
         total_mtm += mtm
-    
+
     print(f"Portfolio MTM: ₹{total_mtm:.0f}")
-    
+
     if total_mtm >= RUPEE_TARGET:
         print(f"🎯 ₹10K TARGET HIT!")
         exit_all_positions("RUPEE_TARGET", total_mtm)
@@ -609,12 +669,17 @@ def monitor_positions():
         print(f"🛑 ₹3.5K SL HIT!")
         exit_all_positions("RUPEE_SL", total_mtm)
         return
-    
+
     print("Monitoring... no exits triggered")
 
-def dashboard():
+
+def dashboard() -> None:
     os.system("cls" if os.name == "nt" else "clear")
-    print("==========  NIFTY TRIPLE-SUPER-TREND SCALPER  –", "PAPER" if PAPER else "LIVE", "MODE  ==========")
+    print(
+        "==========  NIFTY TRIPLE-SUPER-TREND SCALPER  –",
+        "PAPER" if PAPER else "LIVE",
+        "MODE  ==========",
+    )
     print("Time   :", dt.datetime.now().strftime("%H:%M:%S"))
     print("Open   :", len(open_positions))
 
@@ -650,11 +715,7 @@ def dashboard():
     print("======================================================================")
 
 
-# %% [markdown]
-# Cell 9 – Single trade run helper
-
-# %%
-def run_once():
+def run_once() -> None:
     """Detect trend, pick CE/PE, place BUY + SL + TGT (one-shot)."""
     spot = get_nifty_ltp()
     print(f"NIFTY LTP: {spot}")
@@ -673,7 +734,9 @@ def run_once():
     ce_map, pe_map, expiry = build_strike_maps(contracts)
     print("Using expiry:", expiry)
 
-    inst_key, opt_type, strike = pick_instrument_for_trend(trend, spot, ce_map, pe_map)
+    inst_key, opt_type, strike = pick_instrument_for_trend(
+        trend, spot, ce_map, pe_map
+    )
     if not inst_key:
         print("No option instrument selected.")
         return
@@ -693,17 +756,12 @@ def run_once():
     print("Trade placed with SL/TGT and logged.")
 
 
-
-# %% [markdown]
-# Cell 10 – Auto loop (main loop you run in the notebook)
-
-# %%
 def auto_loop(
-    max_trades_per_day=3,
-    monitor_interval_sec=30,
-    start_time=dt.time(9, 20),
-    end_time=dt.time(15, 15),
-):
+    max_trades_per_day: int = 3,
+    monitor_interval_sec: int = 30,
+    start_time: dt.time = dt.time(9, 20),
+    end_time: dt.time = dt.time(15, 15),
+) -> None:
     global open_positions
     trades_done = 0
     print("Starting auto loop. Stop with Kernel Interrupt.")
@@ -730,13 +788,15 @@ def auto_loop(
         if (now > end_time and not open_positions) or (
             trades_done >= max_trades_per_day and not open_positions
         ):
-            print("Stopping auto loop: time window over or max trades done, and no open positions.")
+            print(
+                "Stopping auto loop: time window over or max trades done, "
+                "and no open positions."
+            )
             break
 
         time.sleep(monitor_interval_sec)
-# ======================================================================
-# MAIN
-# ======================================================================
+
+
 if __name__ == "__main__":
     try:
         # For a single manual trade, use this instead of auto loop:
@@ -751,6 +811,3 @@ if __name__ == "__main__":
         )
     except KeyboardInterrupt:
         print("\nNISO-3STD stopped by user.")
-
-
-
