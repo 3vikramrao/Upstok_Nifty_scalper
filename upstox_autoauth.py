@@ -209,10 +209,12 @@ def main():
         f.write(access_token)
 
     print(f"✅ Access token saved to {out_file}.")
-    print("=======================================================")
-    print("Remember: Upstox access tokens expire daily, so rerun this script when needed.")
-    print("=======================================================")
+    print("=" * 55)
+    print("Upstox tokens expire daily – rerun this script when needed.")
+    print("=" * 55)
+
 
 
 if __name__ == "__main__":
     main()
+
