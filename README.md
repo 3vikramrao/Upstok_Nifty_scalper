@@ -1,5 +1,3 @@
-<img src="https://r2cdn.perplexity.ai/pplx-full-logo-primary-dark%402x.png" style="height:64px;margin-right:32px"/>
-
 # Upstox Nifty Scalper Bot
 
 Automated scalping framework for Nifty options using Upstox API with 15+ strategies including HA Scalper, NISO variants, and multi-bot systems.
