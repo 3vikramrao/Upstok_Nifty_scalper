@@ -5,4 +5,10 @@ UPSTOX_REDIRECT_URI='http://localhost:5000/'
 
 UPSTOX_USERNAME = ""                              # mobile or email
 UPSTOX_TOTP_SECRET = ""     # from Upstox TOTP setup
+
 UPSTOX_PIN = ""                                       # 6-digit PIN
+
+MAX_DAILY_LOSS=5000
+MAX_POSITIONS=3
+RISK_PER_TRADE=0.02
+ACCOUNT_BALANCE=100000
