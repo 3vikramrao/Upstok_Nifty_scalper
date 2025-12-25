@@ -23,3 +23,11 @@ webdriver-manager==4.0.1
 # Included in Python stdlib
 
 # Pathlib (Python 3.8+, already included)
+# Existing deps + testing
+upstox-api
+pandas
+ta
+pyyaml
+pytest>=7.4.0
+
+
