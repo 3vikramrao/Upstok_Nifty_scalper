@@ -1,0 +1,18 @@
+strategies:
+  crt_hourly:
+    module: crt_hourly
+    params:
+      ir_streak_min: 2
+      use_volume_filter: true
+  
+  vp_profile:
+    module: vp_profile
+    params:
+      rows: 24
+      va_percentile: 0.7
+  
+  supertrend:
+    module: supertrend
+    params:
+      period: 10
+      multiplier: 2.0

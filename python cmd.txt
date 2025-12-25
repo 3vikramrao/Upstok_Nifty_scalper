@@ -1,0 +1,38 @@
+#bash
+python upstox_auth.py
+
+cd Documents\Kimi_Upstok_Nifty_scalper
+
+python niso-ema520.py
+python niso-std.py
+python niso-vwap.py
+python niso-ema915rsi9.py
+python niso-ema915rsi9std.py
+python niso-multi.py
+python niso-multi-beast.py
+python ha_scalper_v1.py
+python ha_scalper_v2.py
+
+
+
+
+
+
+
+
+
+#bash
+python nifty_scalp.py
+
+#bash
+# one-time
+mkdir -p paper_logs
+python nifty_scalp_paper.py          # paper mode
+
+pip install upstox-python-sdk
+
+# 1. Install core + TA-Lib
+pip install -r requirements.txt
+
+# 2. Install ChromeDriver (for upstox_autoauth.py)
+pip install webdriver-manager

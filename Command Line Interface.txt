@@ -1,0 +1,42 @@
+# Run CRT bot
+python core_bot.py --strategy crt_hourly
+python core_bot.py --strategy ema_crossover
+
+# Run VP
+python core_bot.py --strategy vp_profile
+
+# Ensemble mode
+python core_bot.py --strategies crt,vp,st --mode ensemble
+
+# Backtest mode
+python backtest.py --strategy crt_hourly --days 30
+python backtest.py --strategy ema_crossover --days 30
+python backtest.py --strategy crt_hourly --days 60 --interval 15m
+python backtest.py --strategy crt_hourly --days 60
+python backtest.py --strategy ema_crossover --days 20 --interval 15m
+
+cd "C:\Users\Dell\Documents\Kimi_Upstok_Nifty_scalper"
+
+# Individual tests
+python backtest.py --strategy vp_profile --days 20 --interval 15m
+python backtest.py --strategy crt_hourly --days 20 --interval 15m  
+python backtest.py --strategy ema_crossover --days 20 --interval 15m
+
+# ENSEMBLE (BEST!)
+python backtest.py --strategy multi_bot --days 20 --interval 15m
+
+cd "C:\Users\Dell\Documents\Kimi_Upstok_Nifty_scalper"
+
+# 1. DAILY AUTH (uses YOUR env.py)
+python upstox_auth.py
+# Creates: upstox_access_token.txt
+
+# 2. BACKTEST ALL (simulation)
+python core_bot.py
+
+# 3. LIVE PAPER TRADING (Upstox + paper orders)
+python live_paper_bot.py --strategy multi_bot --duration 7200  # 2 hours
+
+
+
+

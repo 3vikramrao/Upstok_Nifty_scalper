@@ -1,0 +1,25 @@
+# NISO Trading Bots - COMPLETE Requirements (15+ Bots)
+# Covers: niso-*, ha_scalper*, broker_client, upstox_auth, multi-beast, etc.
+
+# CORE (ALL bots)
+requests==2.31.0
+pandas==2.1.4
+numpy==1.26.3
+python-dateutil==2.8.2
+pytz==2023.3
+
+# TIME/DATE (ALL bots)
+# Included in pandas
+
+# TA-Lib (ha_scalper_v1/v2, niso-multi, niso-multi-beast)
+TA-Lib==0.4.28
+
+# Auth helpers (upstox_autoauth.py)
+pyotp==2.9.0
+selenium==4.15.2
+webdriver-manager==4.0.1
+
+# Warnings suppression (some bots)
+# Included in Python stdlib
+
+# Pathlib (Python 3.8+, already included)

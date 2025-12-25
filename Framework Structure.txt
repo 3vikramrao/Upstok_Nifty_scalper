@@ -1,0 +1,20 @@
+niso_bot/
+├── core_bot.py          # Main Upstox bot (unchanged)
+├── strategies/          # External strategy plugins
+│   ├── __init__.py
+│   ├── crt_hourly.py    # CRT plugin
+│   ├── vp_profile.py    # Volume Profile
+│   ├── supertrend.py    # Original
+│   ├── adr_filter.py    # ADR+LOD filter
+│   └── crt_vp_hybrid.py # Combos
+├── config.yaml          # Active strategy + params
+└── paper_logs/
+
+| ---------------- | --------------- | -------------- |
+| Strategy File    | Signal Logic    | Best For       |
+| ---------------- | --------------- | -------------- |
+| crt_hourly.py    | 3IR→OR breakout | 100pt swings   |
+| vp_profile.py    | POC/VA bounce   | Range scalps   |
+| adr_filter.py    | LOD%<20% filter | Early session  |
+| regime_switch.py | ADX+CRT combo   | All conditions |
+| ---------------- | --------------- | -------------- |
