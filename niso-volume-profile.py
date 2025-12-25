@@ -1,13 +1,9 @@
 #!/usr/bin/env python3
 """
-NISO – NIFTY Options Volume Profile Scalper with Paper Logging (Notebook version)
-Replaces Supertrend with Volume Profile POC/VAH/VAL signals for buy-side scalps
+NISO – NIFTY Options Volume Profile Scalper with Paper Logging
+Replaces Supertrend with Volume Profile POC/VAH/VAL signals.
 """
 
-# %% [markdown]
-# Cell 1 – Imports and basic config (UNCHANGED)
-
-# %%
 import os
 import time
 import csv
@@ -15,72 +11,80 @@ import requests
 import pandas as pd
 import numpy as np
 from pathlib import Path
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta  # noqa: F401
 import datetime as dt
-import re
+import re  # noqa: F401
 
-# %% [markdown]
-# Cell 2 – Env variables and global constants (UNCHANGED + VP params)
 
-# %%
-from env import UPSTOX_CLIENT_KEY, UPSTOX_CLIENT_SECRET, UPSTOX_REDIRECT_URI
+# ======================================================================
+# CONFIG & CREDENTIALS
+# ======================================================================
+from env import (
+    UPSTOX_CLIENT_KEY,
+    UPSTOX_CLIENT_SECRET,
+    UPSTOX_REDIRECT_URI,
+)
 
-PAPER = True  # False = LIVE, True = paper-trade with logging
-
+PAPER = True
 CLIENT_ID = UPSTOX_CLIENT_KEY
 CLIENT_SECRET = UPSTOX_CLIENT_SECRET
 REDIRECT_URI = UPSTOX_REDIRECT_URI
 
 if not CLIENT_ID or not CLIENT_SECRET or not REDIRECT_URI:
-    raise RuntimeError("Set UPSTOX_CLIENT_KEY, UPSTOX_CLIENT_SECRET, UPSTOX_REDIRECT_URI in env.py")
+    raise RuntimeError(
+        "Set UPSTOX_CLIENT_KEY, UPSTOX_CLIENT_SECRET, "
+        "UPSTOX_REDIRECT_URI in env.py"
+    )
 
 ACCESS_TOKEN_FILE = "upstox_access_token.txt"
-
 BASE_REST = "https://api.upstox.com/v2"
 BASE_HFT = "https://api-hft.upstox.com/v2"
 
 QTY = 150
-PRODUCT = "I"      # Intraday
+PRODUCT = "I"  # Intraday
 TAG = "niso-volume-profile-bot"
 
 # VP + Risk parameters
-SL_PCT = 0.20        # 20% stop loss
-TG_PCT = 0.30        # 30% target
-TRAIL_ATR_MULT = 1.5 # trailing SL ATR multiple
-VP_ROWS = 24         # Volume profile rows (price bins)
-VA_PERCENTILE = 0.7  # 70% Value Area
+SL_PCT = 0.20
+TG_PCT = 0.30
+TRAIL_ATR_MULT = 1.5
+VP_ROWS = 24
+VA_PERCENTILE = 0.7
 
 PAPER_LOG_DIR = Path("paper_logs")
 NIFTY_SPOT_INSTRUMENT = "NSE_INDEX|Nifty 50"
 UPSTOX_API_VERSION = "2.0"
 
-# %% [markdown]
-# Cell 3 – Auth helpers (UNCHANGED)
 
-# %%
 def get_access_token():
+    """Read Upstox access token from file."""
     if not os.path.exists(ACCESS_TOKEN_FILE):
-        raise RuntimeError("Run your Upstox auth script once to create upstox_access_token.txt")
+        raise RuntimeError(
+            "Run Upstox auth script to create upstox_access_token.txt"
+        )
     with open(ACCESS_TOKEN_FILE, "r", encoding="utf-8") as f:
         token = f.read().strip()
     if not token:
         raise RuntimeError("upstox_access_token.txt is empty")
     return token
 
+
 def api_headers():
-    return {
-        "Authorization": f"Bearer {get_access_token()}",
-        "accept": "application/json",
-    }
+    """REST API headers."""
+    return {"Authorization": f"Bearer {get_access_token()}", "accept": "application/json"}
+
 
 def hft_headers():
+    """HFT API headers."""
     return {
         "Authorization": f"Bearer {get_access_token()}",
         "accept": "application/json",
         "Content-Type": "application/json",
     }
 
+
 def upstox_headers():
+    """Upstox API headers with version."""
     return {
         "Authorization": f"Bearer {get_access_token()}",
         "Api-Version": UPSTOX_API_VERSION,
@@ -88,14 +92,14 @@ def upstox_headers():
         "Content-Type": "application/json",
     }
 
+
 def now_iso():
+    """Current ISO timestamp."""
     return datetime.now().isoformat(timespec="seconds")
 
-# %% [markdown]
-# Cell 4 – Logging helpers (UNCHANGED)
 
-# %%
 def ensure_log_files():
+    """Create paper log files."""
     PAPER_LOG_DIR.mkdir(parents=True, exist_ok=True)
 
     lifetime_file = PAPER_LOG_DIR / "lifetime-vp_log.csv"
@@ -123,7 +127,9 @@ def ensure_log_files():
 
     return lifetime_file, today_file
 
+
 def get_nifty_option_contracts(expiry_date=None, verbose=True):
+    """Fetch NIFTY option contracts."""
     params = {"instrument_key": "NSE_INDEX|Nifty 50"}
     if expiry_date:
         params["expiry_date"] = expiry_date
@@ -136,7 +142,9 @@ def get_nifty_option_contracts(expiry_date=None, verbose=True):
     j = r.json()
     return j.get("data", [])
 
+
 def instrument_info_from_key(instrument_key: str, contracts=None):
+    """Get strike/type/expiry from instrument_key."""
     if contracts is None:
         try:
             contracts = get_nifty_option_contracts(verbose=False)
@@ -153,9 +161,10 @@ def instrument_info_from_key(instrument_key: str, contracts=None):
             }
     return None
 
-def log_trade_row(row):
-    lifetime_file, today_file = ensure_log_files()
 
+def log_trade_row(row):
+    """Log trade to CSV files."""
+    lifetime_file, today_file = ensure_log_files()
     instrument_key = row[3]
     info = instrument_info_from_key(instrument_key)
 
@@ -174,11 +183,9 @@ def log_trade_row(row):
             writer = csv.writer(fh)
             writer.writerow(log_row)
 
-# %% [markdown]
-# Cell 5 – Market data (UNCHANGED)
 
-# %%
 def get_nifty_ltp():
+    """Get NIFTY 50 spot LTP."""
     req_key = "NSE_INDEX|Nifty 50"
     url = f"{BASE_REST}/market-quote/ltp"
     params = {"instrument_key": req_key}
@@ -189,17 +196,19 @@ def get_nifty_ltp():
     j = r.json()
     data_block = j.get("data", {})
     if not data_block:
-        raise RuntimeError(f"No data in LTP response: {j}")
+        raise RuntimeError(f"No LTP data: {j}")
     key = list(data_block.keys())[0]
     item = data_block[key]
     return item.get("last_price") or item.get("ltp")
 
+
 def get_nifty_intraday_candles(minutes_back: int):
+    """Get NIFTY 1min candles."""
     end_time = dt.datetime.now()
     start_time = end_time - dt.timedelta(minutes=minutes_back)
 
     url = (
-        f"https://api.upstox.com/v2/historical-candle/intraday/"
+        "https://api.upstox.com/v2/historical-candle/intraday/"
         f"{NIFTY_SPOT_INSTRUMENT}/1minute"
     )
     params = {
@@ -225,11 +234,9 @@ def get_nifty_intraday_candles(minutes_back: int):
         )
     return pd.DataFrame(rows)
 
-# %% [markdown]
-# Cell 6 – VOLUME PROFILE LOGIC (NEW - Replaces Supertrend)
 
-# %%
 def build_strike_maps(contracts):
+    """Build CE/PE strike maps for nearest expiry."""
     df = pd.DataFrame(contracts)
     if df.empty:
         return {}, {}, None
@@ -242,41 +249,38 @@ def build_strike_maps(contracts):
     pe_map = dict(zip(pe_df["strike_price"], pe_df["instrument_key"]))
     return ce_map, pe_map, nearest_expiry
 
+
 def pick_near_atm_strikes(spot, strike_list, n=5):
+    """Pick N nearest ATM strikes."""
     if not strike_list:
         return []
     sorted_strikes = sorted(strike_list, key=lambda k: abs(k - spot))
     return sorted_strikes[:n]
 
+
 def calculate_volume_profile(df, rows=VP_ROWS):
-    """Build Volume Profile with POC, VAH, VAL from 1-min candles."""
+    """Build Volume Profile with POC, VAH, VAL."""
     if len(df) < 20:
         return None
-    
-    # Price range for bins
+
     price_min = df['low'].min()
     price_max = df['high'].max()
     bin_size = (price_max - price_min) / rows
-    
-    # Create price bins
+
     bins = np.arange(price_min, price_max + bin_size, bin_size)
     df['price_bin'] = np.digitize(df[['low', 'high']].mean(axis=1), bins)
-    
-    # Volume at each price level
+
     vp = df.groupby('price_bin')['volume'].sum().sort_index()
-    
     if vp.empty:
         return None
-    
-    # POC = highest volume node
+
     poc_bin = vp.idxmax()
     poc_price = bins[poc_bin]
-    
-    # Value Area (70% of total volume)
+
     total_vol = vp.sum()
     target_vol = total_vol * VA_PERCENTILE
     sorted_vp = vp.sort_values(ascending=False)
-    
+
     cumulative_vol = 0
     value_area_bins = [poc_bin]
     for bin_idx in sorted_vp.index:
@@ -286,10 +290,10 @@ def calculate_volume_profile(df, rows=VP_ROWS):
         value_area_bins.append(bin_idx)
         if cumulative_vol >= target_vol:
             break
-    
+
     vah_price = bins[max(value_area_bins)]
     val_price = bins[min(value_area_bins)]
-    
+
     return {
         'poc': poc_price,
         'vah': vah_price,
@@ -298,370 +302,7 @@ def calculate_volume_profile(df, rows=VP_ROWS):
         'bin_size': bin_size
     }
 
+
 def detect_vp_signal(df):
-    """
-    Volume Profile signals:
-    Returns 1 for CALL (POC/VAL bounce), -1 for PUT (VAH rejection), 0 for no signal.
-    """
-    if df.empty or len(df) < 30:
-        return 0
-    
-    vp_data = calculate_volume_profile(df)
-    if not vp_data:
-        return 0
-    
-    current_price = df['close'].iloc[-1]
-    prev_price = df['close'].iloc[-2]
-    current_volume = df['volume'].iloc[-1]
-    avg_volume = df['volume'].rolling(10).mean().iloc[-1]
-    
-    poc = vp_data['poc']
-    val = vp_data['val']
-    vah = vp_data['vah']
-    
-    print(f"VP: POC={poc:.1f}, VAL={val:.1f}, VAH={vah:.1f}, Price={current_price:.1f}, Vol={current_volume:.0f}")
-    
-    # CALL signal: Bounce from POC/VAL + volume surge + price turning up
-    if (current_price > prev_price and 
-        (abs(current_price - poc) < vp_data['bin_size'] * 0.5 or 
-         abs(current_price - val) < vp_data['bin_size'] * 0.5) and
-        current_volume > avg_volume * 1.2):
-        return 1
-    
-    # PUT signal: Rejection from VAH + volume surge + price turning down
-    elif (current_price < prev_price and 
-          abs(current_price - vah) < vp_data['bin_size'] * 0.5 and
-          current_volume > avg_volume * 1.2):
-        return -1
-    
-    return 0
-
-def pick_instrument_for_vp_signal(signal, spot, ce_map, pe_map):
-    """Pick ATM CE/PE based on VP signal."""
-    if signal == 0:
-        return None, None, None
-    if signal == 1:  # CALL signal
-        strikes = pick_near_atm_strikes(spot, list(ce_map.keys()), n=3)
-        if not strikes:
-            return None, None, None
-        strike = strikes[0]  # Nearest ATM
-        return ce_map[strike], "CE", strike
-    else:  # PUT signal
-        strikes = pick_near_atm_strikes(spot, list(pe_map.keys()), n=3)
-        if not strikes:
-            return None, None, None
-        strike = strikes[0]
-        return pe_map[strike], "PE", strike
-
-# %% [markdown]
-# Cell 7 – Option LTP and order placement (UNCHANGED)
-
-# %%
-def get_option_ltp(instrument_key):
-    url = f"{BASE_REST}/market-quote/ltp"
-    params = {"instrument_key": instrument_key}
-    r = requests.get(url, headers=api_headers(), params=params)
-    r.raise_for_status()
-    j = r.json()
-    data_block = j.get("data", {})
-    key = list(data_block.keys())[0]
-    item = data_block[key]
-    return item.get("last_price") or item.get("ltp")
-
-def place_hft_market_order(instrument_token, quantity, side):
-    url = f"{BASE_HFT}/order/place"
-    payload = {
-        "quantity": quantity,
-        "product": PRODUCT,
-        "validity": "DAY",
-        "price": 0,
-        "tag": TAG,
-        "instrument_token": instrument_token,
-        "order_type": "MARKET",
-        "transaction_type": side.upper(),
-        "disclosed_quantity": 0,
-        "trigger_price": 0,
-        "is_amo": False,
-    }
-    if PAPER:
-        print("[PAPER] MARKET:", payload)
-        return f"PAPER-MKT-{side}-{int(time.time())}"
-    r = requests.post(url, headers=hft_headers(), json=payload)
-    print("Order status:", r.status_code, r.text[:200])
-    r.raise_for_status()
-    return r.json()["data"]["order_id"]
-
-def place_hft_limit_order(instrument_token, quantity, side, price):
-    payload = {
-        "quantity": quantity,
-        "product": PRODUCT,
-        "validity": "DAY",
-        "price": float(price),
-        "tag": TAG,
-        "instrument_token": instrument_token,
-        "order_type": "LIMIT",
-        "transaction_type": side.upper(),
-        "disclosed_quantity": 0,
-        "trigger_price": 0,
-        "is_amo": False,
-    }
-    if PAPER:
-        print("[PAPER] LIMIT:", payload)
-        return f"PAPER-LMT-{side}-{int(time.time())}"
-    r = requests.post(f"{BASE_HFT}/order/place", headers=hft_headers(), json=payload)
-    print("LIMIT status:", r.status_code, r.text[:200])
-    r.raise_for_status()
-    return r.json()["data"]["order_id"]
-
-def place_hft_sl_order(instrument_token, quantity, side, price, trigger_price):
-    payload = {
-        "quantity": quantity,
-        "product": PRODUCT,
-        "validity": "DAY",
-        "price": float(price),
-        "tag": TAG,
-        "instrument_token": instrument_token,
-        "order_type": "SL",
-        "transaction_type": side.upper(),
-        "disclosed_quantity": 0,
-        "trigger_price": float(trigger_price),
-        "is_amo": False,
-    }
-    if PAPER:
-        print("[PAPER] SL:", payload)
-        return f"PAPER-SL-{side}-{int(time.time())}"
-    r = requests.post(f"{BASE_HFT}/order/place", headers=hft_headers(), json=payload)
-    print("SL status:", r.status_code, r.text[:200])
-    r.raise_for_status()
-    return r.json()["data"]["order_id"]
-
-# %% [markdown]
-# Cell 8 – Position class (UNCHANGED)
-
-# %%
-open_positions = {}
-daily_pnl = 0.0
-
-class Position:
-    def __init__(self, entry_oid, instrument_key, qty, entry_price):
-        self.entry_oid = entry_oid
-        self.instrument_key = instrument_key
-        self.qty = qty
-        self.entry_price = entry_price
-
-        self.sl_price = entry_price * (1 - SL_PCT)
-        self.tgt_price = entry_price * (1 + TG_PCT)
-        self.trail_price = self.sl_price
-
-        # Place SL + TGT
-        self.sl_oid = place_hft_sl_order(
-            instrument_key, qty, "SELL",
-            self.sl_price,
-            self.sl_price * 1.02
-        )
-        self.tgt_oid = place_hft_limit_order(
-            instrument_key, qty, "SELL",
-            self.tgt_price
-        )
-
-        print(f"Position: entry={entry_price:.2f}, SL={self.sl_price:.2f}, TGT={self.tgt_price:.2f}")
-
-        # Log entry
-        row = [
-            now_iso(),
-            "BUY",
-            TAG,
-            self.instrument_key,
-            self.qty,
-            round(self.entry_price, 2),
-            round(self.sl_price, 2),
-            round(self.tgt_price, 2),
-            "ENTRY",
-            0.0,
-        ]
-        log_trade_row(row)
-
-def update_trailing_sl(pos: Position):
-    ltp = get_option_ltp(pos.instrument_key)
-    atr_proxy = ltp * 0.10
-    new_trail = ltp - TRAIL_ATR_MULT * atr_proxy
-    if new_trail > pos.trail_price:
-        pos.trail_price = new_trail
-        print(f"Trail updated to {pos.trail_price:.2f} (LTP={ltp:.2f})")
-
-def check_exit_conditions(pos: Position):
-    ltp = get_option_ltp(pos.instrument_key)
-    if ltp <= pos.trail_price:
-        print(f"TRAIL HIT: {ltp:.2f} <= {pos.trail_price:.2f}")
-        return "TRAIL"
-    elif ltp >= pos.tgt_price:
-        print(f"TARGET HIT: {ltp:.2f} >= {pos.tgt_price:.2f}")
-        return "TARGET"
-    return None
-
-def monitor_positions():
-    global open_positions, daily_pnl
-    for entry_oid, pos in list(open_positions.items()):
-        update_trailing_sl(pos)
-        reason = check_exit_conditions(pos)
-        if reason:
-            print(f"EXIT {entry_oid}: {reason}")
-
-            exit_ltp = get_option_ltp(pos.instrument_key)
-            pnl = (exit_ltp - pos.entry_price) * pos.qty
-            daily_pnl += pnl
-
-            if reason == "TRAIL":
-                r = "EXIT_TRAIL"
-            elif reason == "TARGET":
-                r = "EXIT_TARGET"
-            else:
-                r = "EXIT"
-
-            row = [
-                now_iso(),
-                "SELL",
-                TAG,
-                pos.instrument_key,
-                pos.qty,
-                exit_ltp,
-                round(pos.sl_price, 2),
-                round(pos.tgt_price, 2),
-                r,
-                round(pnl, 2),
-            ]
-            log_trade_row(row)
-
-            del open_positions[entry_oid]
-    print("Monitor done; open positions:", len(open_positions))
-
-def dashboard():
-    os.system("cls" if os.name == "nt" else "clear")
-    print("==========  NIFTY VOLUME PROFILE SCALPER  –", "PAPER" if PAPER else "LIVE", "MODE  ==========")
-    print("Time   :", dt.datetime.now().strftime("%H:%M:%S"))
-    print("Open   :", len(open_positions))
-
-    contracts = get_nifty_option_contracts(verbose=False)
-
-    total_mtm = 0.0
-    for oid, pos in open_positions.items():
-        ltp = get_option_ltp(pos.instrument_key)
-        mtm = (ltp - pos.entry_price) * pos.qty
-        total_mtm += mtm
-
-        info = instrument_info_from_key(pos.instrument_key, contracts)
-        if info:
-            print(
-                f"  {pos.instrument_key} "
-                f"({info['strike']} {info['type']} {info['expiry']})  "
-                f"ENTRY {pos.entry_price:.2f}  "
-                f"LTP {ltp:.2f}  "
-                f"SL {pos.trail_price:.2f}  "
-                f"MTM {mtm:.0f}"
-            )
-        else:
-            print(
-                f"  {pos.instrument_key}  "
-                f"ENTRY {pos.entry_price:.2f}  "
-                f"LTP {ltp:.2f}  "
-                f"SL {pos.trail_price:.2f}  "
-                f"MTM {mtm:.0f}"
-            )
-
-    print(f"Open MTM : {total_mtm:.0f}")
-    print(f"Daily P&L: {daily_pnl:.0f}")
-    print("====================================================")
-
-# %% [markdown]
-# Cell 9 – Single trade run (VP VERSION)
-
-# %%
-def run_once():
-    """Detect VP signal, pick CE/PE, place BUY + SL + TGT."""
-    spot = get_nifty_ltp()
-    print(f"NIFTY LTP: {spot}")
-
-    df = get_nifty_intraday_candles(120)  # 2 hours of 1-min data for VP
-    if df.empty:
-        print("No candle data.")
-        return
-
-    signal = detect_vp_signal(df)
-    if signal == 0:
-        print("No clear VP signal.")
-        return
-
-    contracts = get_nifty_option_contracts()
-    ce_map, pe_map, expiry = build_strike_maps(contracts)
-    print("Using expiry:", expiry)
-
-    inst_key, opt_type, strike = pick_instrument_for_vp_signal(signal, spot, ce_map, pe_map)
-    if not inst_key:
-        print("No option instrument selected.")
-        return
-
-    print(f"VP SIGNAL: BUY {opt_type} {strike} ({inst_key})")
-
-    opt_ltp = get_option_ltp(inst_key)
-    print(f"Option LTP: {opt_ltp}")
-
-    entry_oid = place_hft_market_order(inst_key, QTY, "BUY")
-    pos = Position(entry_oid, inst_key, QTY, opt_ltp)
-
-    open_positions[entry_oid] = pos
-    print("VP Trade placed with SL/TGT and logged.")
-
-# %% [markdown]
-# Cell 10 – Auto loop (UNCHANGED)
-
-# %%
-def auto_loop(
-    max_trades_per_day=3,
-    monitor_interval_sec=30,
-    start_time=dt.time(9, 20),
-    end_time=dt.time(15, 15),
-):
-    global open_positions
-    trades_done = 0
-    print("Starting VP auto loop. Stop with Kernel Interrupt.")
-    while True:
-        now = dt.datetime.now().time()
-
-        if now < start_time or now > end_time:
-            print("Outside trading window, sleeping 60s...")
-            time.sleep(60)
-            continue
-
-        if not open_positions and trades_done < max_trades_per_day:
-            print("\n=== ENTERING NEW VP TRADE ===")
-            run_once()
-            if open_positions:
-                trades_done += 1
-        else:
-            print("\n=== MONITORING POSITIONS ===")
-            monitor_positions()
-
-        dashboard()
-
-        now = dt.datetime.now().time()
-        if (now > end_time and not open_positions) or (
-            trades_done >= max_trades_per_day and not open_positions
-        ):
-            print("Stopping VP auto loop: time window over or max trades done.")
-            break
-
-        time.sleep(monitor_interval_sec)
-
-# ======================================================================
-# MAIN
-# ======================================================================
-if __name__ == "__main__":
-    try:
-        auto_loop(
-            max_trades_per_day=3,
-            monitor_interval_sec=30,
-            start_time=dt.time(9, 20),
-            end_time=dt.time(15, 15),
-        )
-    except KeyboardInterrupt:
-        print("\nNISO-VP stopped by user.")
+    """Detect VP signals: 1=CALL, -1=PUT, 0=no signal."""
+    if df.empty or len(df) < 30
