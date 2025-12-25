@@ -6,7 +6,7 @@ Requirements:
 - env.py with:
     UPSTOX_CLIENT_KEY, UPSTOX_CLIENT_SECRET, UPSTOX_REDIRECT_URI
 - upstox_access_token.txt created by your auth script
-- Folder paper_log/ will be auto-created with:
+- Folder paper_logs/ will be auto-created with:
     - lifetime-ema_log.csv
     - YYYY-MM-DD-ema_trades.csv
 """
@@ -19,8 +19,6 @@ import pandas as pd
 import numpy as np
 from pathlib import Path
 from datetime import datetime, timedelta
-import datetime as dt
-import re
 
 # ======================================================================
 # CONFIG & CREDENTIALS
@@ -34,26 +32,24 @@ CLIENT_SECRET = UPSTOX_CLIENT_SECRET
 REDIRECT_URI = UPSTOX_REDIRECT_URI
 
 if not CLIENT_ID or not CLIENT_SECRET or not REDIRECT_URI:
-    raise RuntimeError("Set UPSTOX_CLIENT_KEY, UPSTOX_CLIENT_SECRET, UPSTOX_REDIRECT_URI in env.py")
+    raise RuntimeError(
+        "Set UPSTOX_CLIENT_KEY, UPSTOX_CLIENT_SECRET, UPSTOX_REDIRECT_URI in env.py"
+    )
 
 ACCESS_TOKEN_FILE = "upstox_access_token.txt"
-
 BASE_REST = "https://api.upstox.com/v2"
 BASE_HFT = "https://api-hft.upstox.com/v2"
 
 QTY = 150
-PRODUCT = "I"      # Intraday
+PRODUCT = "I"  # Intraday
 TAG = "niso-ema-bot"
 
 # SL/TGT parameters
-SL_PCT = 0.20         # 20% stop loss
-TG_PCT = 0.30         # 30% target
+SL_PCT = 0.20  # 20% stop loss
+TG_PCT = 0.30  # 30% target
 TRAIL_ATR_MULT = 1.5  # trailing SL ATR multiple
 
-# Paper log config
 PAPER_LOG_DIR = Path("paper_logs")
-
-# NIFTY 50 index instrument key for candles
 NIFTY_SPOT_INSTRUMENT = "NSE_INDEX|Nifty 50"
 UPSTOX_API_VERSION = "2.0"
 
@@ -61,13 +57,54 @@ UPSTOX_API_VERSION = "2.0"
 SUPERTREND_PERIOD = 10
 SUPERTREND_MULTIPLIER = 2.0
 
+
+# ======================================================================
+# UTILITY FUNCTIONS
+# ======================================================================
+def get_access_token():
+    """Get access token from file."""
+    if not os.path.exists(ACCESS_TOKEN_FILE):
+        raise RuntimeError(
+            "Run your Upstox auth script once to create upstox_access_token.txt"
+        )
+    with open(ACCESS_TOKEN_FILE, "r", encoding="utf-8") as f:
+        token = f.read().strip()
+    if not token:
+        raise RuntimeError("upstox_access_token.txt is empty")
+    return token
+
+
 def upstox_headers():
+    """Return Upstox API headers."""
     return {
         "Authorization": f"Bearer {get_access_token()}",
         "Api-Version": UPSTOX_API_VERSION,
         "accept": "application/json",
         "Content-Type": "application/json",
     }
+
+
+def api_headers():
+    """Return REST API headers."""
+    return {
+        "Authorization": f"Bearer {get_access_token()}",
+        "accept": "application/json",
+    }
+
+
+def hft_headers():
+    """Return HFT API headers."""
+    return {
+        "Authorization": f"Bearer {get_access_token()}",
+        "accept": "application/json",
+        "Content-Type": "application/json",
+    }
+
+
+def now_iso():
+    """Current timestamp in ISO 8601 with seconds."""
+    return datetime.now().isoformat(timespec="seconds")
+
 
 # ======================================================================
 # LOGGING HELPERS
@@ -84,7 +121,7 @@ def ensure_log_files():
         "side",
         "symbol",
         "instrument_key",
-        "strike",        # e.g. '26200 CE'
+        "strike",  # e.g. '26200 CE'
         "qty",
         "entry_price",
         "sl_price",
@@ -105,7 +142,7 @@ def ensure_log_files():
 def instrument_info_from_key(instrument_key: str, contracts=None):
     """
     Return strike/type/expiry/trading_symbol for a numeric Upstox instrument_key
-    like 'NSE_FO|57013' by looking into option contracts list.[web:7]
+    like 'NSE_FO|57013' by looking into option contracts list.
     """
     if contracts is None:
         try:
@@ -117,11 +154,12 @@ def instrument_info_from_key(instrument_key: str, contracts=None):
         if c.get("instrument_key") == instrument_key:
             return {
                 "strike": c.get("strike_price"),
-                "type": c.get("instrument_type"),   # CE or PE
+                "type": c.get("instrument_type"),  # CE or PE
                 "expiry": c.get("expiry"),
                 "trading_symbol": c.get("trading_symbol"),
             }
     return None
+
 
 def log_trade_row(row):
     """
@@ -140,7 +178,6 @@ def log_trade_row(row):
         strike_val = float(info["strike"])
         opt_type = info.get("type") or ""
         expiry = info.get("expiry") or ""
-        # Final display: 26200.0 CE 2025-12-23
         strike_display = f"{strike_val:.1f} {opt_type} {expiry}".strip()
     else:
         strike_display = "N/A"
@@ -154,40 +191,8 @@ def log_trade_row(row):
             writer.writerow(log_row)
 
 
-
-def now_iso():
-    """Current timestamp in ISO 8601 with seconds."""
-    return datetime.now().isoformat(timespec="seconds")
-
 # ======================================================================
-# AUTH & HEADERS
-# ======================================================================
-def get_access_token():
-    if not os.path.exists(ACCESS_TOKEN_FILE):
-        raise RuntimeError("Run your Upstox auth script once to create upstox_access_token.txt")
-    with open(ACCESS_TOKEN_FILE, "r", encoding="utf-8") as f:
-        token = f.read().strip()
-    if not token:
-        raise RuntimeError("upstox_access_token.txt is empty")
-    return token
-
-
-def api_headers():
-    return {
-        "Authorization": f"Bearer {get_access_token()}",
-        "accept": "application/json",
-    }
-
-
-def hft_headers():
-    return {
-        "Authorization": f"Bearer {get_access_token()}",
-        "accept": "application/json",
-        "Content-Type": "application/json",
-    }
-
-# ======================================================================
-# NIFTY SPOT LTP & CANDLES
+# NIFTY DATA FUNCTIONS
 # ======================================================================
 def get_nifty_ltp():
     """NIFTY index LTP via LTP endpoint."""
@@ -206,9 +211,11 @@ def get_nifty_ltp():
     item = data_block[key]
     return item.get("last_price") or item.get("ltp")
 
+
 def get_nifty_intraday_candles(minutes_back: int):
-    end_time = dt.datetime.now()
-    start_time = end_time - dt.timedelta(minutes=minutes_back)
+    """Get Nifty 1-minute candles."""
+    end_time = datetime.now()
+    start_time = end_time - timedelta(minutes=minutes_back)
 
     url = (
         f"https://api.upstox.com/v2/historical-candle/intraday/"
@@ -227,7 +234,7 @@ def get_nifty_intraday_candles(minutes_back: int):
     for c in data["data"]["candles"]:
         rows.append(
             dict(
-                time=dt.datetime.fromisoformat(c[0].replace("Z", "+00:00")),
+                time=datetime.fromisoformat(c[0].replace("Z", "+00:00")),
                 open=c[1],
                 high=c[2],
                 low=c[3],
@@ -237,11 +244,12 @@ def get_nifty_intraday_candles(minutes_back: int):
         )
     return pd.DataFrame(rows)
 
+
 # ======================================================================
-# OPTION CONTRACTS, STRIKES & TREND
+# OPTION CONTRACTS & STRIKE SELECTION
 # ======================================================================
 def get_nifty_option_contracts(expiry_date=None, verbose=True):
-    """NIFTY option contracts via option/contract endpoint.[web:7]"""
+    """NIFTY option contracts via option/contract endpoint."""
     params = {"instrument_key": "NSE_INDEX|Nifty 50"}
     if expiry_date:
         params["expiry_date"] = expiry_date
@@ -254,7 +262,9 @@ def get_nifty_option_contracts(expiry_date=None, verbose=True):
     j = r.json()
     return j.get("data", [])
 
+
 def build_strike_maps(contracts):
+    """Build CE/PE strike maps for nearest expiry."""
     df = pd.DataFrame(contracts)
     if df.empty:
         return {}, {}, None
@@ -269,38 +279,56 @@ def build_strike_maps(contracts):
 
 
 def pick_near_atm_strikes(spot, strike_list, n=5):
+    """Pick n nearest ATM strikes."""
     if not strike_list:
         return []
     sorted_strikes = sorted(strike_list, key=lambda k: abs(k - spot))
     return sorted_strikes[:n]
 
+
+# ======================================================================
+# TECHNICAL INDICATORS
+# ======================================================================
+def ema(series, n):
+    """Calculate EMA."""
+    return series.ewm(span=n, adjust=False).mean()
+
+
 def supertrend(df, period=SUPERTREND_PERIOD, multiplier=SUPERTREND_MULTIPLIER):
-    """SuperTrend(10,2): Returns 1=bullish, -1=bearish [web:1][web:2]"""
+    """SuperTrend(10,2): Returns 1=bullish, -1=bearish."""
     if len(df) < period + 1:
         return 0
-        
-    high, low, close = df['high'], df['low'], df['close']
-    
+
+    high, low, close = df["high"], df["low"], df["close"]
+
     # ATR
     tr1 = high - low
     tr2 = abs(high - close.shift(1))
     tr3 = abs(low - close.shift(1))
     tr = pd.concat([tr1, tr2, tr3], axis=1).max(axis=1)
     atr = tr.ewm(span=period, adjust=False).mean()
-    
+
     # Basic bands
     hl2 = (high + low) / 2
     upper_basic = hl2 + (multiplier * atr)
     lower_basic = hl2 - (multiplier * atr)
-    
+
     # Final bands
     upper_final = upper_basic.copy()
     lower_final = lower_basic.copy()
-    
+
     for i in range(1, len(df)):
-        upper_final.iloc[i] = upper_basic.iloc[i] if close.iloc[i-1] <= upper_final.iloc[i-1] else upper_basic.iloc[i-1]
-        lower_final.iloc[i] = lower_basic.iloc[i] if close.iloc[i-1] >= lower_final.iloc[i-1] else lower_basic.iloc[i-1]
-    
+        upper_final.iloc[i] = (
+            upper_basic.iloc[i]
+            if close.iloc[i - 1] <= upper_final.iloc[i - 1]
+            else upper_basic.iloc[i - 1]
+        )
+        lower_final.iloc[i] = (
+            lower_basic.iloc[i]
+            if close.iloc[i - 1] >= lower_final.iloc[i - 1]
+            else lower_basic.iloc[i - 1]
+        )
+
     # Direction
     direction = pd.Series(0, index=df.index)
     for i in range(1, len(df)):
@@ -309,17 +337,15 @@ def supertrend(df, period=SUPERTREND_PERIOD, multiplier=SUPERTREND_MULTIPLIER):
         elif close.iloc[i] >= upper_final.iloc[i]:
             direction.iloc[i] = 1
         else:
-            direction.iloc[i] = direction.iloc[i-1]
-    
+            direction.iloc[i] = direction.iloc[i - 1]
+
     return direction.iloc[-1]
 
-def ema(series, n):
-    return series.ewm(span=n, adjust=False).mean()
 
-def compute_momentum_bars(df: pd.DataFrame) -> pd.DataFrame:
-    """Original RSI9 + momentum bars computation [original code]"""
+def compute_momentum_bars(df):
+    """Original RSI9 + momentum bars computation."""
     close = df["close"]
-    
+
     # RSI(9) Wilder
     delta = close.diff()
     up = delta.clip(lower=0)
@@ -328,47 +354,57 @@ def compute_momentum_bars(df: pd.DataFrame) -> pd.DataFrame:
     alpha = 1 / n_rsi
     up_rma = up.ewm(alpha=alpha, adjust=False).mean()
     down_rma = down.ewm(alpha=alpha, adjust=False).mean()
-    
-    rsi = np.where(down_rma == 0, 100, np.where(up_rma == 0, 0, 100 - 100 / (1 + up_rma / down_rma)))
+
+    rsi = np.where(
+        down_rma == 0,
+        100,
+        np.where(up_rma == 0, 0, 100 - 100 / (1 + up_rma / down_rma)),
+    )
     df["rsi"] = rsi
-    
+
     # Momentum signals
     rsi_series = df["rsi"]
     rsi_ema3 = rsi_series.ewm(span=3, adjust=False).mean()
-    rsi_wma21 = rsi_series.rolling(21).apply(lambda x: np.dot(x, np.arange(1,22))/21*21, raw=True)
-    
+    rsi_wma21 = rsi_series.rolling(21).apply(
+        lambda x: np.dot(x, np.arange(1, 22)) / (21 * 21), raw=True
+    )
+
     mom_up = (rsi_series > rsi_ema3) & (rsi_series > rsi_wma21)
     mom_up_strong = (rsi_series > rsi_wma21) & (rsi_series > 50)
     mom_dn = (rsi_series < rsi_ema3) & (rsi_series < rsi_wma21)
     mom_dn_strong = (rsi_series < rsi_wma21) & (rsi_series < 40)
-    
+
     df["mom_up"] = mom_up
     df["mom_up_strong"] = mom_up_strong
     df["mom_dn"] = mom_dn
     df["mom_dn_strong"] = mom_dn_strong
     df["rsi"] = rsi_series
-    
+
     bar_color = np.where(mom_up, "green", np.where(mom_dn, "red", "white"))
     df["bar_color"] = bar_color
-    
+
     return df
+
 
 def detect_trend(df):
     """TRIPLE CONFIRMATION: SuperTrend + EMA + RSI Momentum. All 3 must align."""
     if df.empty or len(df) < max(15, SUPERTREND_PERIOD + 5):
         print("Insufficient data")
         return 0
-    
+
     # 1. SuperTrend(10,2)
     st_dir = supertrend(df)
-    print(f"SuperTrend({SUPERTREND_PERIOD},{SUPERTREND_MULTIPLIER})={1 if st_dir==1 else -1 if st_dir==-1 else 0}")
-    
+    print(
+        f"SuperTrend({SUPERTREND_PERIOD},{SUPERTREND_MULTIPLIER})="
+        f"{1 if st_dir == 1 else -1 if st_dir == -1 else 0}"
+    )
+
     # 2. EMA9 vs EMA15
     ema9 = ema(df["close"], 9).iloc[-1]
     ema15 = ema(df["close"], 15).iloc[-1]
     ema_bull = ema9 > ema15
     print(f"EMA9={ema9:.1f} > EMA15={ema15:.1f}? {ema_bull}")
-    
+
     # 3. RSI9 Momentum (latest bar)
     df = compute_momentum_bars(df)
     rsi_mom_bull = df["mom_up"].iloc[-1] or df["mom_up_strong"].iloc[-1]
@@ -376,18 +412,24 @@ def detect_trend(df):
     rsi_val = df["rsi"].iloc[-1]
     print(f"RSI9={rsi_val:.1f}, MomUp={rsi_mom_bull}, MomDn={rsi_mom_bear}")
     last_bar_color = df["bar_color"].iloc[-1]
-    
+
     # TRIPLE CONFIRMATION REQUIRED
     bull_confirmed = (st_dir == 1) and ema_bull and rsi_mom_bull
     bear_confirmed = (st_dir == -1) and not ema_bull and rsi_mom_bear
-    
-    print(f"\n=== TRIPLE CONFIRMATION ===")
-    print(f"SuperTrend: {'🟢' if st_dir==1 else '🔴' if st_dir==-1 else '⚪'}")
+
+    print("\n=== TRIPLE CONFIRMATION ===")
+    print(f"SuperTrend: {'🟢' if st_dir == 1 else '🔴' if st_dir == -1 else '⚪'}")
     print(f"EMA Cross: {'🟢' if ema_bull else '🔴'}")
-    print(f"RSI Mom: {'🟢' if rsi_mom_bull else '🔴' if rsi_mom_bear else '⚪'} {last_bar_color}")
-    print(f"ENTRY: {'🟢 BULL' if bull_confirmed else '🔴 BEAR' if bear_confirmed else '⚪ NEUTRAL'}")
-    
+    print(
+        f"RSI Mom: {'🟢' if rsi_mom_bull else '🔴' if rsi_mom_bear else '⚪'} "
+        f"{last_bar_color}"
+    )
+    print(
+        f"ENTRY: {'🟢 BULL' if bull_confirmed else '🔴 BEAR' if bear_confirmed else '⚪ NEUTRAL'}"
+    )
+
     return 1 if bull_confirmed else -1 if bear_confirmed else 0
+
 
 def pick_instrument_for_trend(trend, spot, ce_map, pe_map):
     """Pick one ATM CE or PE instrument_key based on trend."""
@@ -406,11 +448,9 @@ def pick_instrument_for_trend(trend, spot, ce_map, pe_map):
         strike = strikes[0]
         return pe_map[strike], "PE", strike
 
+
 def info_from_instrument_key(contracts, instrument_key: str):
-    """
-    Given the full contracts list from get_nifty_option_contracts(),
-    return strike, type, expiry, trading_symbol for a specific instrument_key.
-    """
+    """Get instrument info from key."""
     for c in contracts:
         if c.get("instrument_key") == instrument_key:
             return {
@@ -421,10 +461,12 @@ def info_from_instrument_key(contracts, instrument_key: str):
             }
     return None
 
+
 # ======================================================================
-# OPTION LTP & HFT ORDER HELPERS
+# ORDER FUNCTIONS
 # ======================================================================
 def get_option_ltp(instrument_key):
+    """Get option LTP."""
     url = f"{BASE_REST}/market-quote/ltp"
     params = {"instrument_key": instrument_key}
     r = requests.get(url, headers=api_headers(), params=params)
@@ -437,6 +479,7 @@ def get_option_ltp(instrument_key):
 
 
 def place_hft_market_order(instrument_token, quantity, side):
+    """Place HFT market order."""
     url = f"{BASE_HFT}/order/place"
     payload = {
         "quantity": quantity,
@@ -461,6 +504,7 @@ def place_hft_market_order(instrument_token, quantity, side):
 
 
 def place_hft_limit_order(instrument_token, quantity, side, price):
+    """Place HFT limit order."""
     payload = {
         "quantity": quantity,
         "product": PRODUCT,
@@ -484,6 +528,7 @@ def place_hft_limit_order(instrument_token, quantity, side, price):
 
 
 def place_hft_sl_order(instrument_token, quantity, side, price, trigger_price):
+    """Place HFT SL order."""
     payload = {
         "quantity": quantity,
         "product": PRODUCT,
@@ -505,13 +550,17 @@ def place_hft_sl_order(instrument_token, quantity, side, price, trigger_price):
     r.raise_for_status()
     return r.json()["data"]["order_id"]
 
+
 # ======================================================================
-# POSITION CLASS & TRAILING LOGIC
+# POSITION MANAGEMENT
 # ======================================================================
 open_positions = {}
 daily_pnl = 0.0
 
+
 class Position:
+    """Position tracking class."""
+
     def __init__(self, entry_oid, instrument_key, qty, entry_price):
         self.entry_oid = entry_oid
         self.instrument_key = instrument_key
@@ -524,16 +573,20 @@ class Position:
 
         # Place paper/live SL + TGT orders
         self.sl_oid = place_hft_sl_order(
-            instrument_key, qty, "SELL",
+            instrument_key,
+            qty,
+            "SELL",
             self.sl_price,
-            self.sl_price * 1.02
+            self.sl_price * 1.02,
         )
         self.tgt_oid = place_hft_limit_order(
-            instrument_key, qty, "SELL",
-            self.tgt_price
+            instrument_key, qty, "SELL", self.tgt_price
         )
 
-        print(f"Position: entry={entry_price:.2f}, SL={self.sl_price:.2f}, TGT={self.tgt_price:.2f}")
+        print(
+            f"Position: entry={entry_price:.2f}, "
+            f"SL={self.sl_price:.2f}, TGT={self.tgt_price:.2f}"
+        )
 
         # Log entry (paper or live) into CSVs (strike/type added in log_trade_row)
         row = [
@@ -546,12 +599,13 @@ class Position:
             round(self.sl_price, 2),
             round(self.tgt_price, 2),
             "ENTRY",
-            0.0,   # pnl
+            0.0,  # pnl
         ]
         log_trade_row(row)
 
 
-def update_trailing_sl(pos: Position):
+def update_trailing_sl(pos):
+    """Update trailing stop loss."""
     ltp = get_option_ltp(pos.instrument_key)
     atr_proxy = ltp * 0.10
     new_trail = ltp - TRAIL_ATR_MULT * atr_proxy
@@ -560,7 +614,8 @@ def update_trailing_sl(pos: Position):
         print(f"Trail updated to {pos.trail_price:.2f} (LTP={ltp:.2f})")
 
 
-def check_exit_conditions(pos: Position):
+def check_exit_conditions(pos):
+    """Check if position should exit."""
     ltp = get_option_ltp(pos.instrument_key)
     if ltp <= pos.trail_price:
         print(f"TRAIL HIT: {ltp:.2f} <= {pos.trail_price:.2f}")
@@ -572,6 +627,7 @@ def check_exit_conditions(pos: Position):
 
 
 def monitor_positions():
+    """Monitor all open positions."""
     global open_positions, daily_pnl
     for entry_oid, pos in list(open_positions.items()):
         update_trailing_sl(pos)
@@ -601,17 +657,23 @@ def monitor_positions():
                 round(pos.sl_price, 2),
                 round(pos.tgt_price, 2),
                 r,
-                round(pnl, 2),            # pnl for this round-trip
+                round(pnl, 2),  # pnl for this round-trip
             ]
             log_trade_row(row)
 
             del open_positions[entry_oid]
     print("Monitor done; open positions:", len(open_positions))
 
+
 def dashboard():
+    """Display dashboard."""
     os.system("cls" if os.name == "nt" else "clear")
-    print("==========  NIFTY EMA SCALPER  –", "PAPER" if PAPER else "LIVE", "MODE  ==========")
-    print("Time   :", dt.datetime.now().strftime("%H:%M:%S"))
+    print(
+        "==========  NIFTY EMA SCALPER  –",
+        "PAPER" if PAPER else "LIVE",
+        "MODE  ==========",
+    )
+    print("Time   :", datetime.now().strftime("%H:%M:%S"))
     print("Open   :", len(open_positions))
 
     # fetch contracts once for strike lookup, without debug spam
@@ -646,8 +708,9 @@ def dashboard():
     print(f"Daily P&L: {daily_pnl:.0f}")
     print("====================================================")
 
+
 # ======================================================================
-# ONE-SHOT ENTRY (run_once)
+# TRADING LOGIC
 # ======================================================================
 def run_once():
     """Enhanced with triple confirmation."""
@@ -658,31 +721,31 @@ def run_once():
     if df.empty:
         print("No candle data.")
         return
-    
+
     trend = detect_trend(df)  # Now uses ALL 3 indicators
     if trend == 0:
         print("❌ No triple confirmation.")
         return
-    
-    # [Rest of run_once identical...]
+
     contracts = get_nifty_option_contracts()
     ce_map, pe_map, expiry = build_strike_maps(contracts)
     print("Using expiry:", expiry)
-    
+
     inst_key, opt_type, strike = pick_instrument_for_trend(trend, spot, ce_map, pe_map)
     if not inst_key:
         print("No option instrument selected.")
         return
-    
+
     print(f"🚀 BUY {opt_type} {strike} ({inst_key}) - TRIPLE CONFIRMED!")
-    
+
     opt_ltp = get_option_ltp(inst_key)
     print(f"Option LTP: {opt_ltp:.2f}")
-    
+
     entry_oid = place_hft_market_order(inst_key, QTY, "BUY")
     pos = Position(entry_oid, inst_key, QTY, opt_ltp)
     open_positions[entry_oid] = pos
     print("✅ Trade placed with SL/TGT and logged.")
+
 
 # ======================================================================
 # AUTO LOOP
@@ -690,14 +753,15 @@ def run_once():
 def auto_loop(
     max_trades_per_day=3,
     monitor_interval_sec=30,
-    start_time=dt.time(9, 20),
-    end_time=dt.time(15, 15),
+    start_time=datetime.time(9, 20),
+    end_time=datetime.time(15, 15),
 ):
+    """Main auto trading loop."""
     global open_positions
     trades_done = 0
     print("Starting auto loop. Stop with Ctrl+C.")
     while True:
-        now = dt.datetime.now().time()
+        now = datetime.now().time()
 
         if now < start_time or now > end_time:
             print("Outside trading window, sleeping 60s...")
@@ -716,14 +780,18 @@ def auto_loop(
         # always show dashboard here
         dashboard()
 
-        now = dt.datetime.now().time()
+        now = datetime.now().time()
         if (now > end_time and not open_positions) or (
             trades_done >= max_trades_per_day and not open_positions
         ):
-            print("Stopping auto loop: time window over or max trades done, and no open positions.")
+            print(
+                "Stopping auto loop: time window over or max trades done, "
+                "and no open positions."
+            )
             break
 
         time.sleep(monitor_interval_sec)
+
 
 # ======================================================================
 # MAIN
@@ -736,8 +804,8 @@ if __name__ == "__main__":
         auto_loop(
             max_trades_per_day=3,
             monitor_interval_sec=30,
-            start_time=dt.time(9, 15),
-            end_time=dt.time(15, 15),
+            start_time=datetime.time(9, 15),
+            end_time=datetime.time(15, 15),
         )
     except KeyboardInterrupt:
         print("\nNISO-TRIPLE stopped by user.")
