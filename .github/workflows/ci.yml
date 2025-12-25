@@ -1,0 +1,66 @@
+name: CI/CD Pipeline (Windows)
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    runs-on: windows-latest  # ← Windows runner
+    strategy:
+      matrix:
+        python-version: ['3.10', '3.11']
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python-version }}
+    
+    - name: Install dependencies
+      shell: powershell  # ← Windows PowerShell
+      run: |
+        pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install pytest pytest-cov black flake8
+        
+    - name: Lint code
+      shell: powershell
+      run: |
+        black --check .
+        flake8 .
+    
+    - name: Run tests
+      shell: powershell
+      run: |
+        pytest tests/ --cov=. --cov-report=xml -v
+        
+    - name: Upload coverage
+      uses: codecov/codecov-action@v4
+
+  deploy-windows:
+    needs: test
+    runs-on: windows-latest
+    if: github.ref == 'refs/heads/main'
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Deploy to Windows VPS/Server
+      shell: powershell
+      run: |
+        # Windows Server deployment (PowerShell remoting)
+        $session = New-PSSession -ComputerName ${{ secrets.WINDOWS_HOST }} `
+                                 -Credential (New-Object System.Management.Automation.PSCredential `
+                                 ("${{ secrets.WINDOWS_USER }}", `
+                                 (ConvertTo-SecureString "${{ secrets.WINDOWS_PASSWORD }}" -AsPlainText -Force)))
+        
+        Invoke-Command -Session $session -ScriptBlock {
+          cd C:\Upstok_Nifty_scalper
+          git pull origin main
+          pip install -r requirements.txt --upgrade
+          Restart-Service nifty-scalper
+        }
