@@ -11,22 +11,27 @@ import pandas as pd
 import numpy as np
 from pathlib import Path
 from datetime import datetime, timedelta
-import datetime as dt
 import re
 import talib  # Add this: pip install TA-Lib
 
 # ======================================================================
 # CONFIG & CREDENTIALS (UNCHANGED)
 # ======================================================================
-from env import UPSTOX_CLIENT_KEY, UPSTOX_CLIENT_SECRET, UPSTOX_REDIRECT_URI
+from env import (
+    UPSTOX_CLIENT_KEY,
+    UPSTOX_CLIENT_SECRET,
+    UPSTOX_REDIRECT_URI,
+)
 
-PAPER = True # False = LIVE, True = paper-trade with logging
+PAPER = True  # False = LIVE, True = paper-trade with logging
 CLIENT_ID = UPSTOX_CLIENT_KEY
 CLIENT_SECRET = UPSTOX_CLIENT_SECRET
 REDIRECT_URI = UPSTOX_REDIRECT_URI
 
 if not CLIENT_ID or not CLIENT_SECRET or not REDIRECT_URI:
-    raise RuntimeError("Set UPSTOX_CLIENT_KEY, UPSTOX_CLIENT_SECRET, UPSTOX_REDIRECT_URI in env.py")
+    raise RuntimeError(
+        "Set UPSTOX_CLIENT_KEY, UPSTOX_CLIENT_SECRET, UPSTOX_REDIRECT_URI in env.py"
+    )
 
 ACCESS_TOKEN_FILE = "upstox_access_token.txt"
 BASE_REST = "https://api.upstox.com/v2"
@@ -44,158 +49,175 @@ TRAIL_ATR_MULT = 1.5
 PAPER_LOG_DIR = Path("paper_logs")
 NIFTY_SPOT_INSTRUMENT = "NSE_INDEX|Nifty 50"
 UPSTOX_API_VERSION = "2.0"
+
 # Indicator Parameters
 SUPERTREND_PERIOD = 10
 SUPERTREND_MULTIPLIER = 2.0
+
+
 # ======================================================================
 # TECHNICAL INDICATORS (NEW SECTION)
 # ======================================================================
-def calculate_indicators(df):
-    """Calculate all indicators: EMA9/15, RSI9, SuperTrend, Parabolic SAR, VWAP"""
-    if len(df) < 20:
-        return df
-    
-    # EMAs
-    df['ema9'] = ema(df['close'], 9)
-    df['ema15'] = ema(df['close'], 15)
-    
-    # RSI
-    df['rsi9'] = talib.RSI(df['close'], timeperiod=9)
-    
-    # SuperTrend (ATR 10, Multiplier 2)
-    df = add_supertrend(df)
-    
-    # Parabolic SAR (default 0.02, 0.2)
-    df['parabolic_sar'] = talib.SAR(df['high'], df['low'])
-    
-    # VWAP (Volume Weighted Average Price)
-    df['vwap'] = calculate_vwap(df)
-    
-    return df
-
 def ema(series, n):
+    """Calculate EMA."""
     return series.ewm(span=n, adjust=False).mean()
-
-def add_supertrend(df, atr_period=10, multiplier=2.0):
-    """SuperTrend implementation - FIXED for pandas indexing"""
-    high = df['high'].values
-    low = df['low'].values
-    close = df['close'].values
-    
-    # ATR using numpy arrays
-    atr = talib.ATR(high, low, close, timeperiod=atr_period)
-    
-    # HL2
-    hl2 = (high + low) / 2
-    
-    # Upper/Lower bands
-    upperband = hl2 + (multiplier * atr)
-    lowerband = hl2 - (multiplier * atr)
-    
-    # Initialize SuperTrend array
-    supertrend = np.full(len(df), np.nan)
-    in_uptrend = [True]
-    
-    # First value
-    supertrend[0] = lowerband[0]
-    
-    # Loop from second candle
-    for i in range(1, len(df)):
-        # Trend direction logic
-        if close[i] > upperband[i-1]:
-            in_uptrend.append(True)
-        elif close[i] < lowerband[i-1]:
-            in_uptrend.append(False)
-        else:
-            in_uptrend.append(in_uptrend[-1])
-        
-        # SuperTrend value
-        if in_uptrend[-1]:
-            supertrend[i] = lowerband[i]
-            if supertrend[i] > supertrend[i-1]:
-                supertrend[i] = supertrend[i-1]
-        else:
-            supertrend[i] = upperband[i]
-            if supertrend[i] < supertrend[i-1]:
-                supertrend[i] = supertrend[i-1]
-    
-    df['supertrend'] = supertrend
-    return df
 
 
 def calculate_vwap(df):
-    """Volume Weighted Average Price"""
-    typical_price = (df['high'] + df['low'] + df['close']) / 3
-    vwap = (typical_price * df['volume']).cumsum() / df['volume'].cumsum()
+    """Volume Weighted Average Price."""
+    typical_price = (df["high"] + df["low"] + df["close"]) / 3
+    vwap = (typical_price * df["volume"]).cumsum() / df["volume"].cumsum()
     return vwap
+
+
+def add_supertrend(df, atr_period=10, multiplier=2.0):
+    """SuperTrend implementation - FIXED for pandas indexing."""
+    high = df["high"].values
+    low = df["low"].values
+    close = df["close"].values
+
+    # ATR using numpy arrays
+    atr = talib.ATR(high, low, close, timeperiod=atr_period)
+
+    # HL2
+    hl2 = (high + low) / 2
+
+    # Upper/Lower bands
+    upperband = hl2 + (multiplier * atr)
+    lowerband = hl2 - (multiplier * atr)
+
+    # Initialize SuperTrend array
+    supertrend = np.full(len(df), np.nan)
+    in_uptrend = [True]
+
+    # First value
+    supertrend[0] = lowerband[0]
+
+    # Loop from second candle
+    for i in range(1, len(df)):
+        # Trend direction logic
+        if close[i] > upperband[i - 1]:
+            in_uptrend.append(True)
+        elif close[i] < lowerband[i - 1]:
+            in_uptrend.append(False)
+        else:
+            in_uptrend.append(in_uptrend[-1])
+
+        # SuperTrend value
+        if in_uptrend[-1]:
+            supertrend[i] = lowerband[i]
+            if supertrend[i] > supertrend[i - 1]:
+                supertrend[i] = supertrend[i - 1]
+        else:
+            supertrend[i] = upperband[i]
+            if supertrend[i] < supertrend[i - 1]:
+                supertrend[i] = supertrend[i - 1]
+
+    df["supertrend"] = supertrend
+    return df
+
+
+def calculate_indicators(df):
+    """Calculate all indicators: EMA9/15, RSI9, SuperTrend, Parabolic SAR, VWAP."""
+    if len(df) < 20:
+        return df
+
+    # EMAs
+    df["ema9"] = ema(df["close"], 9)
+    df["ema15"] = ema(df["close"], 15)
+
+    # RSI
+    df["rsi9"] = talib.RSI(df["close"], timeperiod=9)
+
+    # SuperTrend (ATR 10, Multiplier 2)
+    df = add_supertrend(df)
+
+    # Parabolic SAR (default 0.02, 0.2)
+    df["parabolic_sar"] = talib.SAR(df["high"], df["low"])
+
+    # VWAP (Volume Weighted Average Price)
+    df["vwap"] = calculate_vwap(df)
+
+    return df
+
 
 # ======================================================================
 # ENHANCED TREND DETECTION
 # ======================================================================
 def detect_multi_trend(df):
-    """Multi-indicator trend detection: 1=bullish, -1=bearish, 0=neutral"""
+    """Multi-indicator trend detection: 1=bullish, -1=bearish, 0=neutral."""
     if df.empty or len(df) < 20:
         return 0
-    
+
     latest = df.iloc[-1]
     prev = df.iloc[-2]
-    
+
     signals = []
-    
+
     # 1. EMA 9/15 crossover
-    ema_bull = latest['ema9'] > latest['ema15'] and prev['ema9'] <= prev['ema15']
-    ema_bear = latest['ema9'] < latest['ema15'] and prev['ema9'] >= prev['ema15']
+    ema_bull = latest["ema9"] > latest["ema15"] and prev["ema9"] <= prev["ema15"]
+    ema_bear = latest["ema9"] < latest["ema15"] and prev["ema9"] >= prev["ema15"]
     if ema_bull:
         signals.append(1)
     elif ema_bear:
         signals.append(-1)
-    
+
     # 2. RSI 9 (oversold/overbought with momentum)
-    rsi = latest['rsi9']
-    rsi_prev = prev['rsi9']
+    rsi = latest["rsi9"]
+    rsi_prev = prev["rsi9"]
     if rsi > 50 and rsi > rsi_prev:  # Bullish momentum
         signals.append(1)
     elif rsi < 50 and rsi < rsi_prev:  # Bearish momentum
         signals.append(-1)
-    
+
     # 3. SuperTrend
-    if latest['close'] > latest['supertrend'] and prev['close'] <= prev['supertrend']:
+    if latest["close"] > latest["supertrend"] and prev["close"] <= prev["supertrend"]:
         signals.append(1)
-    elif latest['close'] < latest['supertrend'] and prev['close'] >= prev['supertrend']:
+    elif latest["close"] < latest["supertrend"] and prev["close"] >= prev["supertrend"]:
         signals.append(-1)
-    
+
     # 4. Parabolic SAR
-    if latest['close'] > latest['parabolic_sar'] and prev['close'] <= prev['parabolic_sar']:
+    if latest["close"] > latest["parabolic_sar"] and prev["close"] <= prev["parabolic_sar"]:
         signals.append(1)
-    elif latest['close'] < latest['parabolic_sar'] and prev['close'] >= prev['parabolic_sar']:
+    elif latest["close"] < latest["parabolic_sar"] and prev["close"] >= prev["parabolic_sar"]:
         signals.append(-1)
-    
+
     # 5. VWAP
-    if latest['close'] > latest['vwap'] and prev['close'] <= prev['vwap']:
+    if latest["close"] > latest["vwap"] and prev["close"] <= prev["vwap"]:
         signals.append(1)
-    elif latest['close'] < latest['vwap'] and prev['close'] >= prev['vwap']:
+    elif latest["close"] < latest["vwap"] and prev["close"] >= prev["vwap"]:
         signals.append(-1)
-    
+
     # Consensus: majority vote
     bull_signals = sum(1 for s in signals if s == 1)
     bear_signals = sum(1 for s in signals if s == -1)
-    
-    print(f"Signals: Bull={bull_signals}, Bear={bear_signals}, Neutral={len(signals)-bull_signals-bear_signals}")
-    print(f"EMA9/15: {latest['ema9']:.1f}/{latest['ema15']:.1f}, RSI: {rsi:.1f}, ST:{latest['supertrend']:.1f}, SAR:{latest['parabolic_sar']:.1f}, VWAP:{latest['vwap']:.1f}")
-    
+
+    print(
+        f"Signals: Bull={bull_signals}, Bear={bear_signals}, "
+        f"Neutral={len(signals) - bull_signals - bear_signals}"
+    )
+    print(
+        f"EMA9/15: {latest['ema9']:.1f}/{latest['ema15']:.1f}, "
+        f"RSI: {rsi:.1f}, ST:{latest['supertrend']:.1f}, "
+        f"SAR:{latest['parabolic_sar']:.1f}, VWAP:{latest['vwap']:.1f}"
+    )
+
     if bull_signals > bear_signals:
         return 1
     elif bear_signals > bull_signals:
         return -1
     return 0
 
+
 def upstox_headers():
+    """Return Upstox API headers."""
     return {
         "Authorization": f"Bearer {get_access_token()}",
         "Api-Version": UPSTOX_API_VERSION,
         "accept": "application/json",
         "Content-Type": "application/json",
     }
+
 
 # ======================================================================
 # LOGGING HELPERS
@@ -212,7 +234,7 @@ def ensure_log_files():
         "side",
         "symbol",
         "instrument_key",
-        "strike",        # e.g. '26200 CE'
+        "strike",  # e.g. '26200 CE'
         "qty",
         "entry_price",
         "sl_price",
@@ -230,10 +252,45 @@ def ensure_log_files():
     return lifetime_file, today_file
 
 
+def get_access_token():
+    """Get access token from file."""
+    if not os.path.exists(ACCESS_TOKEN_FILE):
+        raise RuntimeError(
+            "Run your Upstox auth script once to create upstox_access_token.txt"
+        )
+    with open(ACCESS_TOKEN_FILE, "r", encoding="utf-8") as f:
+        token = f.read().strip()
+    if not token:
+        raise RuntimeError("upstox_access_token.txt is empty")
+    return token
+
+
+def api_headers():
+    """Return REST API headers."""
+    return {
+        "Authorization": f"Bearer {get_access_token()}",
+        "accept": "application/json",
+    }
+
+
+def hft_headers():
+    """Return HFT API headers."""
+    return {
+        "Authorization": f"Bearer {get_access_token()}",
+        "accept": "application/json",
+        "Content-Type": "application/json",
+    }
+
+
+def now_iso():
+    """Current timestamp in ISO 8601 with seconds."""
+    return datetime.now().isoformat(timespec="seconds")
+
+
 def instrument_info_from_key(instrument_key: str, contracts=None):
     """
     Return strike/type/expiry/trading_symbol for a numeric Upstox instrument_key
-    like 'NSE_FO|57013' by looking into option contracts list.[web:7]
+    like 'NSE_FO|57013' by looking into option contracts list.
     """
     if contracts is None:
         try:
@@ -245,11 +302,12 @@ def instrument_info_from_key(instrument_key: str, contracts=None):
         if c.get("instrument_key") == instrument_key:
             return {
                 "strike": c.get("strike_price"),
-                "type": c.get("instrument_type"),   # CE or PE
+                "type": c.get("instrument_type"),  # CE or PE
                 "expiry": c.get("expiry"),
                 "trading_symbol": c.get("trading_symbol"),
             }
     return None
+
 
 def log_trade_row(row):
     """
@@ -282,38 +340,6 @@ def log_trade_row(row):
             writer.writerow(log_row)
 
 
-
-def now_iso():
-    """Current timestamp in ISO 8601 with seconds."""
-    return datetime.now().isoformat(timespec="seconds")
-
-# ======================================================================
-# AUTH & HEADERS
-# ======================================================================
-def get_access_token():
-    if not os.path.exists(ACCESS_TOKEN_FILE):
-        raise RuntimeError("Run your Upstox auth script once to create upstox_access_token.txt")
-    with open(ACCESS_TOKEN_FILE, "r", encoding="utf-8") as f:
-        token = f.read().strip()
-    if not token:
-        raise RuntimeError("upstox_access_token.txt is empty")
-    return token
-
-
-def api_headers():
-    return {
-        "Authorization": f"Bearer {get_access_token()}",
-        "accept": "application/json",
-    }
-
-
-def hft_headers():
-    return {
-        "Authorization": f"Bearer {get_access_token()}",
-        "accept": "application/json",
-        "Content-Type": "application/json",
-    }
-
 # ======================================================================
 # NIFTY SPOT LTP & CANDLES
 # ======================================================================
@@ -334,9 +360,11 @@ def get_nifty_ltp():
     item = data_block[key]
     return item.get("last_price") or item.get("ltp")
 
+
 def get_nifty_intraday_candles(minutes_back: int):
-    end_time = dt.datetime.now()
-    start_time = end_time - dt.timedelta(minutes=minutes_back)
+    """Get Nifty 1-minute candles."""
+    end_time = datetime.now()
+    start_time = end_time - timedelta(minutes=minutes_back)
 
     url = (
         f"https://api.upstox.com/v2/historical-candle/intraday/"
@@ -355,7 +383,7 @@ def get_nifty_intraday_candles(minutes_back: int):
     for c in data["data"]["candles"]:
         rows.append(
             dict(
-                time=dt.datetime.fromisoformat(c[0].replace("Z", "+00:00")),
+                time=datetime.fromisoformat(c[0].replace("Z", "+00:00")),
                 open=c[1],
                 high=c[2],
                 low=c[3],
@@ -365,11 +393,12 @@ def get_nifty_intraday_candles(minutes_back: int):
         )
     return pd.DataFrame(rows)
 
+
 # ======================================================================
 # OPTION CONTRACTS, STRIKES & TREND
 # ======================================================================
 def get_nifty_option_contracts(expiry_date=None, verbose=True):
-    """NIFTY option contracts via option/contract endpoint.[web:7]"""
+    """NIFTY option contracts via option/contract endpoint."""
     params = {"instrument_key": "NSE_INDEX|Nifty 50"}
     if expiry_date:
         params["expiry_date"] = expiry_date
@@ -382,7 +411,9 @@ def get_nifty_option_contracts(expiry_date=None, verbose=True):
     j = r.json()
     return j.get("data", [])
 
+
 def build_strike_maps(contracts):
+    """Build CE/PE strike maps for nearest expiry."""
     df = pd.DataFrame(contracts)
     if df.empty:
         return {}, {}, None
@@ -397,125 +428,12 @@ def build_strike_maps(contracts):
 
 
 def pick_near_atm_strikes(spot, strike_list, n=5):
+    """Pick n nearest ATM strikes."""
     if not strike_list:
         return []
     sorted_strikes = sorted(strike_list, key=lambda k: abs(k - spot))
     return sorted_strikes[:n]
 
-def supertrend(df, period=SUPERTREND_PERIOD, multiplier=SUPERTREND_MULTIPLIER):
-    """SuperTrend(10,2): Returns 1=bullish, -1=bearish [web:1][web:2]"""
-    if len(df) < period + 1:
-        return 0
-        
-    high, low, close = df['high'], df['low'], df['close']
-    
-    # ATR
-    tr1 = high - low
-    tr2 = abs(high - close.shift(1))
-    tr3 = abs(low - close.shift(1))
-    tr = pd.concat([tr1, tr2, tr3], axis=1).max(axis=1)
-    atr = tr.ewm(span=period, adjust=False).mean()
-    
-    # Basic bands
-    hl2 = (high + low) / 2
-    upper_basic = hl2 + (multiplier * atr)
-    lower_basic = hl2 - (multiplier * atr)
-    
-    # Final bands
-    upper_final = upper_basic.copy()
-    lower_final = lower_basic.copy()
-    
-    for i in range(1, len(df)):
-        upper_final.iloc[i] = upper_basic.iloc[i] if close.iloc[i-1] <= upper_final.iloc[i-1] else upper_basic.iloc[i-1]
-        lower_final.iloc[i] = lower_basic.iloc[i] if close.iloc[i-1] >= lower_final.iloc[i-1] else lower_basic.iloc[i-1]
-    
-    # Direction
-    direction = pd.Series(0, index=df.index)
-    for i in range(1, len(df)):
-        if close.iloc[i] <= lower_final.iloc[i]:
-            direction.iloc[i] = -1
-        elif close.iloc[i] >= upper_final.iloc[i]:
-            direction.iloc[i] = 1
-        else:
-            direction.iloc[i] = direction.iloc[i-1]
-    
-    return direction.iloc[-1]
-
-def ema(series, n):
-    return series.ewm(span=n, adjust=False).mean()
-
-def compute_momentum_bars(df: pd.DataFrame) -> pd.DataFrame:
-    """Original RSI9 + momentum bars computation [original code]"""
-    close = df["close"]
-    
-    # RSI(9) Wilder
-    delta = close.diff()
-    up = delta.clip(lower=0)
-    down = -delta.clip(upper=0)
-    n_rsi = 9
-    alpha = 1 / n_rsi
-    up_rma = up.ewm(alpha=alpha, adjust=False).mean()
-    down_rma = down.ewm(alpha=alpha, adjust=False).mean()
-    
-    rsi = np.where(down_rma == 0, 100, np.where(up_rma == 0, 0, 100 - 100 / (1 + up_rma / down_rma)))
-    df["rsi"] = rsi
-    
-    # Momentum signals
-    rsi_series = df["rsi"]
-    rsi_ema3 = rsi_series.ewm(span=3, adjust=False).mean()
-    rsi_wma21 = rsi_series.rolling(21).apply(lambda x: np.dot(x, np.arange(1,22))/21*21, raw=True)
-    
-    mom_up = (rsi_series > rsi_ema3) & (rsi_series > rsi_wma21)
-    mom_up_strong = (rsi_series > rsi_wma21) & (rsi_series > 50)
-    mom_dn = (rsi_series < rsi_ema3) & (rsi_series < rsi_wma21)
-    mom_dn_strong = (rsi_series < rsi_wma21) & (rsi_series < 40)
-    
-    df["mom_up"] = mom_up
-    df["mom_up_strong"] = mom_up_strong
-    df["mom_dn"] = mom_dn
-    df["mom_dn_strong"] = mom_dn_strong
-    df["rsi"] = rsi_series
-    
-    bar_color = np.where(mom_up, "green", np.where(mom_dn, "red", "white"))
-    df["bar_color"] = bar_color
-    
-    return df
-
-def detect_trend(df):
-    """TRIPLE CONFIRMATION: SuperTrend + EMA + RSI Momentum. All 3 must align."""
-    if df.empty or len(df) < max(15, SUPERTREND_PERIOD + 5):
-        print("Insufficient data")
-        return 0
-    
-    # 1. SuperTrend(10,2)
-    st_dir = supertrend(df)
-    print(f"SuperTrend({SUPERTREND_PERIOD},{SUPERTREND_MULTIPLIER})={1 if st_dir==1 else -1 if st_dir==-1 else 0}")
-    
-    # 2. EMA9 vs EMA15
-    ema9 = ema(df["close"], 9).iloc[-1]
-    ema15 = ema(df["close"], 15).iloc[-1]
-    ema_bull = ema9 > ema15
-    print(f"EMA9={ema9:.1f} > EMA15={ema15:.1f}? {ema_bull}")
-    
-    # 3. RSI9 Momentum (latest bar)
-    df = compute_momentum_bars(df)
-    rsi_mom_bull = df["mom_up"].iloc[-1] or df["mom_up_strong"].iloc[-1]
-    rsi_mom_bear = df["mom_dn"].iloc[-1] or df["mom_dn_strong"].iloc[-1]
-    rsi_val = df["rsi"].iloc[-1]
-    print(f"RSI9={rsi_val:.1f}, MomUp={rsi_mom_bull}, MomDn={rsi_mom_bear}")
-    last_bar_color = df["bar_color"].iloc[-1]
-    
-    # TRIPLE CONFIRMATION REQUIRED
-    bull_confirmed = (st_dir == 1) and ema_bull and rsi_mom_bull
-    bear_confirmed = (st_dir == -1) and not ema_bull and rsi_mom_bear
-    
-    print(f"\n=== TRIPLE CONFIRMATION ===")
-    print(f"SuperTrend: {'🟢' if st_dir==1 else '🔴' if st_dir==-1 else '⚪'}")
-    print(f"EMA Cross: {'🟢' if ema_bull else '🔴'}")
-    print(f"RSI Mom: {'🟢' if rsi_mom_bull else '🔴' if rsi_mom_bear else '⚪'} {last_bar_color}")
-    print(f"ENTRY: {'🟢 BULL' if bull_confirmed else '🔴 BEAR' if bear_confirmed else '⚪ NEUTRAL'}")
-    
-    return 1 if bull_confirmed else -1 if bear_confirmed else 0
 
 def pick_instrument_for_trend(trend, spot, ce_map, pe_map):
     """Pick one ATM CE or PE instrument_key based on trend."""
@@ -534,6 +452,7 @@ def pick_instrument_for_trend(trend, spot, ce_map, pe_map):
         strike = strikes[0]
         return pe_map[strike], "PE", strike
 
+
 def info_from_instrument_key(contracts, instrument_key: str):
     """
     Given the full contracts list from get_nifty_option_contracts(),
@@ -549,10 +468,12 @@ def info_from_instrument_key(contracts, instrument_key: str):
             }
     return None
 
+
 # ======================================================================
 # OPTION LTP & HFT ORDER HELPERS
 # ======================================================================
 def get_option_ltp(instrument_key):
+    """Get option LTP."""
     url = f"{BASE_REST}/market-quote/ltp"
     params = {"instrument_key": instrument_key}
     r = requests.get(url, headers=api_headers(), params=params)
@@ -565,6 +486,7 @@ def get_option_ltp(instrument_key):
 
 
 def place_hft_market_order(instrument_token, quantity, side):
+    """Place HFT market order."""
     url = f"{BASE_HFT}/order/place"
     payload = {
         "quantity": quantity,
@@ -589,6 +511,7 @@ def place_hft_market_order(instrument_token, quantity, side):
 
 
 def place_hft_limit_order(instrument_token, quantity, side, price):
+    """Place HFT limit order."""
     payload = {
         "quantity": quantity,
         "product": PRODUCT,
@@ -612,6 +535,7 @@ def place_hft_limit_order(instrument_token, quantity, side, price):
 
 
 def place_hft_sl_order(instrument_token, quantity, side, price, trigger_price):
+    """Place HFT SL order."""
     payload = {
         "quantity": quantity,
         "product": PRODUCT,
@@ -633,13 +557,17 @@ def place_hft_sl_order(instrument_token, quantity, side, price, trigger_price):
     r.raise_for_status()
     return r.json()["data"]["order_id"]
 
+
 # ======================================================================
 # POSITION CLASS & TRAILING LOGIC
 # ======================================================================
 open_positions = {}
 daily_pnl = 0.0
 
+
 class Position:
+    """Position tracking class."""
+
     def __init__(self, entry_oid, instrument_key, qty, entry_price):
         self.entry_oid = entry_oid
         self.instrument_key = instrument_key
@@ -652,16 +580,20 @@ class Position:
 
         # Place paper/live SL + TGT orders
         self.sl_oid = place_hft_sl_order(
-            instrument_key, qty, "SELL",
+            instrument_key,
+            qty,
+            "SELL",
             self.sl_price,
-            self.sl_price * 1.02
+            self.sl_price * 1.02,
         )
         self.tgt_oid = place_hft_limit_order(
-            instrument_key, qty, "SELL",
-            self.tgt_price
+            instrument_key, qty, "SELL", self.tgt_price
         )
 
-        print(f"Position: entry={entry_price:.2f}, SL={self.sl_price:.2f}, TGT={self.tgt_price:.2f}")
+        print(
+            f"Position: entry={entry_price:.2f}, "
+            f"SL={self.sl_price:.2f}, TGT={self.tgt_price:.2f}"
+        )
 
         # Log entry (paper or live) into CSVs (strike/type added in log_trade_row)
         row = [
@@ -674,12 +606,13 @@ class Position:
             round(self.sl_price, 2),
             round(self.tgt_price, 2),
             "ENTRY",
-            0.0,   # pnl
+            0.0,  # pnl
         ]
         log_trade_row(row)
 
 
 def update_trailing_sl(pos: Position):
+    """Update trailing stop loss."""
     ltp = get_option_ltp(pos.instrument_key)
     atr_proxy = ltp * 0.10
     new_trail = ltp - TRAIL_ATR_MULT * atr_proxy
@@ -689,6 +622,7 @@ def update_trailing_sl(pos: Position):
 
 
 def check_exit_conditions(pos: Position):
+    """Check if position should exit."""
     ltp = get_option_ltp(pos.instrument_key)
     if ltp <= pos.trail_price:
         print(f"TRAIL HIT: {ltp:.2f} <= {pos.trail_price:.2f}")
@@ -700,6 +634,7 @@ def check_exit_conditions(pos: Position):
 
 
 def monitor_positions():
+    """Monitor all open positions."""
     global open_positions, daily_pnl
     for entry_oid, pos in list(open_positions.items()):
         update_trailing_sl(pos)
@@ -729,17 +664,23 @@ def monitor_positions():
                 round(pos.sl_price, 2),
                 round(pos.tgt_price, 2),
                 r,
-                round(pnl, 2),            # pnl for this round-trip
+                round(pnl, 2),  # pnl for this round-trip
             ]
             log_trade_row(row)
 
             del open_positions[entry_oid]
     print("Monitor done; open positions:", len(open_positions))
 
+
 def dashboard():
+    """Display dashboard."""
     os.system("cls" if os.name == "nt" else "clear")
-    print("==========  NIFTY MULTI*** SCALPER  –", "PAPER" if PAPER else "LIVE", "MODE  ==========")
-    print("Time   :", dt.datetime.now().strftime("%H:%M:%S"))
+    print(
+        "==========  NIFTY MULTI*** SCALPER  –",
+        "PAPER" if PAPER else "LIVE",
+        "MODE  ==========",
+    )
+    print("Time   :", datetime.now().strftime("%H:%M:%S"))
     print("Open   :", len(open_positions))
 
     # fetch contracts once for strike lookup, without debug spam
@@ -773,6 +714,8 @@ def dashboard():
     print(f"Open MTM : {total_mtm:.0f}")
     print(f"Daily P&L: {daily_pnl:.0f}")
     print("====================================================")
+
+
 # ======================================================================
 # ENHANCED ONE-SHOT ENTRY
 # ======================================================================
@@ -785,13 +728,16 @@ def run_once():
     if df.empty:
         print("No candle data.")
         return
-    
+
     # Calculate ALL indicators
     df = calculate_indicators(df)
-    
+
     trend = detect_multi_trend(df)
-    print(f"\n*** TREND SIGNAL: {'BULLISH' if trend == 1 else 'BEARISH' if trend == -1 else 'NEUTRAL'} ***")
-    
+    print(
+        f"\n*** TREND SIGNAL: "
+        f"{'BULLISH' if trend == 1 else 'BEARISH' if trend == -1 else 'NEUTRAL'} ***"
+    )
+
     if trend == 0:
         print("No clear multi-indicator trend.")
         return
@@ -800,7 +746,9 @@ def run_once():
     ce_map, pe_map, expiry = build_strike_maps(contracts)
     print("Using expiry:", expiry)
 
-    inst_key, opt_type, strike = pick_instrument_for_trend(trend, spot, ce_map, pe_map)
+    inst_key, opt_type, strike = pick_instrument_for_trend(
+        trend, spot, ce_map, pe_map
+    )
     if not inst_key:
         print("No option instrument selected.")
         return
@@ -815,20 +763,23 @@ def run_once():
 
     open_positions[entry_oid] = pos
     print("✅ Trade placed with SL/TGT and logged.")
+
+
 # ======================================================================
 # AUTO LOOP
 # ======================================================================
 def auto_loop(
     max_trades_per_day=3,
     monitor_interval_sec=30,
-    start_time=dt.time(9, 15),
-    end_time=dt.time(15, 15),
+    start_time=datetime.time(9, 15),
+    end_time=datetime.time(15, 15),
 ):
+    """Main auto trading loop."""
     global open_positions
     trades_done = 0
     print("Starting multi-indicator auto loop. Stop with Ctrl+C.")
     while True:
-        now = dt.datetime.now().time()
+        now = datetime.now().time()
 
         if now < start_time or now > end_time:
             print("Outside trading window, sleeping 60s...")
@@ -846,7 +797,7 @@ def auto_loop(
 
         dashboard()
 
-        now = dt.datetime.now().time()
+        now = datetime.now().time()
         if (now > end_time and not open_positions) or (
             trades_done >= max_trades_per_day and not open_positions
         ):
@@ -864,8 +815,8 @@ if __name__ == "__main__":
         auto_loop(
             max_trades_per_day=3,
             monitor_interval_sec=30,
-            start_time=dt.time(9, 15),
-            end_time=dt.time(15, 15),
+            start_time=datetime.time(9, 15),
+            end_time=datetime.time(15, 15),
         )
     except KeyboardInterrupt:
         print("\nNISO-MULTI stopped by user.")
