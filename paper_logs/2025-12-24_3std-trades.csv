@@ -1,0 +1,2 @@
+timestamp,side,symbol,instrument_key,strike,qty,entry_price,sl_price,tgt_price,reason,pnl
+2025-12-24T18:51:48,BUY,niso-triple-supertrend-bot,NSE_FO|65634,26150.0 PE 2025-12-30,150,75.55,60.44,98.22,ENTRY,0.0
