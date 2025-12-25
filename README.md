@@ -102,14 +102,4 @@ python core_bot_master.py
 
 ***
 
-**Copy this content and create `README.md` directly on GitHub:**
-
-1. Go to repo → "Add file" → "Create new file"
-2. Name: `README.md`
-3. Paste above content → Commit
-<span style="display:none">[^1]</span>
-
-<div align="center">⁂</div>
-
-[^1]: https://github.com/3vikramrao/Upstok_Nifty_scalper
 
