@@ -10,7 +10,8 @@ import sys
 import time
 from datetime import datetime, timedelta
 from pathlib import Path
-
+import upstox_client
+from upstox_client import ApiClient, Configuration
 import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).parent))
@@ -22,9 +23,6 @@ except ImportError:
     sys.exit(1)
 
 TOKEN_FILE = "upstox_access_token.txt"
-
-import upstox_client
-from upstox_client import ApiClient, Configuration
 
 STRATEGY_LIST = ["ema_crossover"]
 
@@ -197,3 +195,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
