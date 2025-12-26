@@ -23,12 +23,8 @@ STRATEGY_LIST = ["ema_crossover", "crt_hourly", "vp_profile", "multi_bot"]
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Run ALL Nifty Strategies")
-    parser.add_argument(
-        "--days", "-d", type=int, default=20, help="Days of data"
-    )
-    parser.add_argument(
-        "--interval", "-i", default="15m", choices=["5m", "15m", "1h"]
-    )
+    parser.add_argument("--days", "-d", type=int, default=20, help="Days of data")
+    parser.add_argument("--interval", "-i", default="15m", choices=["5m", "15m", "1h"])
     parser.add_argument(
         "--show-plots", action="store_true", help="Show individual charts"
     )
@@ -71,12 +67,8 @@ STRATEGY_LIST = ["ema_crossover", "crt_hourly", "vp_profile", "multi_bot"]
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Run ALL Nifty Strategies")
-    parser.add_argument(
-        "--days", "-d", type=int, default=20, help="Days of data"
-    )
-    parser.add_argument(
-        "--interval", "-i", default="15m", choices=["5m", "15m", "1h"]
-    )
+    parser.add_argument("--days", "-d", type=int, default=20, help="Days of data")
+    parser.add_argument("--interval", "-i", default="15m", choices=["5m", "15m", "1h"])
     parser.add_argument(
         "--show-plots", action="store_true", help="Show individual charts"
     )
@@ -122,8 +114,7 @@ def fetch_data(days, interval):
             if len(df) > 50:
                 if isinstance(df.columns, pd.MultiIndex):
                     df.columns = [
-                        col[0] if isinstance(col, tuple) else col
-                        for col in df.columns
+                        col[0] if isinstance(col, tuple) else col for col in df.columns
                     ]
                 df = df.dropna()
                 print(f"✅ {symbol}: {len(df)} candles")
@@ -156,9 +147,7 @@ def backtest_strategy(df, strategy_func, name):
 
         df_signals["Position"] = positions
         df_signals["Returns"] = df_signals["Close"].pct_change()
-        df_signals["Strategy"] = (
-            df_signals["Position"].shift(1) * df_signals["Returns"]
-        )
+        df_signals["Strategy"] = df_signals["Position"].shift(1) * df_signals["Returns"]
 
         # Metrics
         total_return = (1 + df_signals["Strategy"].dropna()).prod() - 1
@@ -229,9 +218,7 @@ def run_all_strategy(df, show_plots=False):
                         s=50,
                         label="Short",
                     )
-                    plt.title(
-                        f"{strategy_name} - Return: {result['return']:.2%}"
-                    )
+                    plt.title(f"{strategy_name} - Return: {result['return']:.2%}")
                     plt.legend()
                     plt.show()
 
@@ -313,8 +300,7 @@ def fetch_data(days, interval):
             if len(df) > 50:
                 if isinstance(df.columns, pd.MultiIndex):
                     df.columns = [
-                        col[0] if isinstance(col, tuple) else col
-                        for col in df.columns
+                        col[0] if isinstance(col, tuple) else col for col in df.columns
                     ]
                 df = df.dropna()
                 print(f"✅ {symbol}: {len(df)} candles")
@@ -347,9 +333,7 @@ def backtest_strategy(df, strategy_func, name):
 
         df_signals["Position"] = positions
         df_signals["Returns"] = df_signals["Close"].pct_change()
-        df_signals["Strategy"] = (
-            df_signals["Position"].shift(1) * df_signals["Returns"]
-        )
+        df_signals["Strategy"] = df_signals["Position"].shift(1) * df_signals["Returns"]
 
         # Metrics
         total_return = (1 + df_signals["Strategy"].dropna()).prod() - 1
@@ -420,9 +404,7 @@ def run_all_strategy(df, show_plots=False):
                         s=50,
                         label="Short",
                     )
-                    plt.title(
-                        f"{strategy_name} - Return: {result['return']:.2%}"
-                    )
+                    plt.title(f"{strategy_name} - Return: {result['return']:.2%}")
                     plt.legend()
                     plt.show()
 

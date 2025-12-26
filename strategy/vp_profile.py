@@ -63,15 +63,11 @@ def run_strategy(nifty):
     volume_surge = nifty["Volume"] > nifty["Volume"].rolling(20).mean() * 1.2
 
     nifty["Long_Signal"] = (
-        (nifty["Low"] <= nifty["VAL"])
-        & (nifty["Close"] > nifty["VAL"])
-        & volume_surge
+        (nifty["Low"] <= nifty["VAL"]) & (nifty["Close"] > nifty["VAL"]) & volume_surge
     )
 
     nifty["Short_Signal"] = (
-        (nifty["High"] >= nifty["VAH"])
-        & (nifty["Close"] < nifty["VAH"])
-        & volume_surge
+        (nifty["High"] >= nifty["VAH"]) & (nifty["Close"] < nifty["VAH"]) & volume_surge
     )
 
     poc_bounce_long = (

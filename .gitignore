@@ -1,0 +1,5 @@
+﻿# Temp fix files
+fix-e501.py
+creates fix-long-lines.py
+__pycache__/
+*.pyc

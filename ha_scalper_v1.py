@@ -44,12 +44,12 @@ def heikin_ashi(df):
     ha["ha_open"] = (df["open"].shift(1) + df["close"].shift(1)) / 2
     ha.loc[0, "ha_open"] = (df.loc[0, "open"] + df.loc[0, "close"]) / 2
     ha["ha_open"] = ha["ha_open"].fillna(method="bfill")
-    ha["ha_high"] = pd.concat(
-        [ha["high"], ha["ha_open"], ha["ha_close"]], axis=1
-    ).max(axis=1)
-    ha["ha_low"] = pd.concat(
-        [ha["low"], ha["ha_open"], ha["ha_close"]], axis=1
-    ).min(axis=1)
+    ha["ha_high"] = pd.concat([ha["high"], ha["ha_open"], ha["ha_close"]], axis=1).max(
+        axis=1
+    )
+    ha["ha_low"] = pd.concat([ha["low"], ha["ha_open"], ha["ha_close"]], axis=1).min(
+        axis=1
+    )
     return ha
 
 
@@ -96,9 +96,7 @@ def detect_ha_v1_trend(df):
 
     # 2. Williams %R
     signals.append(
-        1
-        if latest["williams_r"] > -20
-        else -1 if latest["williams_r"] < -80 else 0
+        1 if latest["williams_r"] > -20 else -1 if latest["williams_r"] < -80 else 0
     )
 
     # 3. Z-Score (reversal)
@@ -108,23 +106,15 @@ def detect_ha_v1_trend(df):
 
     # 4. Aroon
     signals.append(
-        1
-        if latest["aroon_up"] > 70
-        else -1 if latest["aroon_down"] > 70 else 0
+        1 if latest["aroon_up"] > 70 else -1 if latest["aroon_down"] > 70 else 0
     )
 
     # 5. Stochastic
-    stoch_bull = (
-        latest["stoch_k"] > latest["stoch_d"] and latest["stoch_k"] > 80
-    )
-    stoch_bear = (
-        latest["stoch_k"] < latest["stoch_d"] and latest["stoch_k"] < 20
-    )
+    stoch_bull = latest["stoch_k"] > latest["stoch_d"] and latest["stoch_k"] > 80
+    stoch_bear = latest["stoch_k"] < latest["stoch_d"] and latest["stoch_k"] < 20
     signals.append(1 if stoch_bull else -1 if stoch_bear else 0)
 
-    bull, bear = sum(1 for s in signals if s == 1), sum(
-        1 for s in signals if s == -1
-    )
+    bull, bear = sum(1 for s in signals if s == 1), sum(1 for s in signals if s == -1)
 
     print(
         f"🎯 V1 REVERSAL: Bull={bull}/5 Bear={bear}/5 | Z={latest['zscore']:.2f} %R={latest['williams_r']:.0f}"
@@ -322,7 +312,9 @@ def log_trade_row(row):
 
     if info and info.get("strike"):
         strike_val = float(info["strike"])
-        strike_display = f"{strike_val:.1f} {info.get('type', '')} {info.get('expiry', '')}".strip()
+        strike_display = (
+            f"{strike_val:.1f} {info.get('type', '')} {info.get('expiry', '')}".strip()
+        )
     else:
         strike_display = "N/A"
 
@@ -446,9 +438,7 @@ def place_hft_limit_order(instrument_token, quantity, side, price):
     if PAPER:
         print("[PAPER] LIMIT:", payload)
         return f"PAPER-LMT-{side}-{int(time.time())}"
-    r = requests.post(
-        f"{BASE_HFT}/order/place", headers=hft_headers(), json=payload
-    )
+    r = requests.post(f"{BASE_HFT}/order/place", headers=hft_headers(), json=payload)
     print("LIMIT status:", r.status_code, r.text[:200])
     r.raise_for_status()
     return r.json()["data"]["order_id"]
@@ -471,9 +461,7 @@ def place_hft_sl_order(instrument_token, quantity, side, price, trigger_price):
     if PAPER:
         print("[PAPER] SL:", payload)
         return f"PAPER-SL-{side}-{int(time.time())}"
-    r = requests.post(
-        f"{BASE_HFT}/order/place", headers=hft_headers(), json=payload
-    )
+    r = requests.post(f"{BASE_HFT}/order/place", headers=hft_headers(), json=payload)
     print("SL status:", r.status_code, r.text[:200])
     r.raise_for_status()
     return r.json()["data"]["order_id"]
@@ -621,9 +609,7 @@ def auto_loop(
             run_once()
             if open_positions:
                 trades_done += 1
-                print(
-                    f"✅ Trades done today: {trades_done}/{max_trades_per_day}"
-                )
+                print(f"✅ Trades done today: {trades_done}/{max_trades_per_day}")
         else:
             print("\n=== 📊 MONITORING POSITIONS ===")
             monitor_positions()

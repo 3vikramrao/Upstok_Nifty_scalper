@@ -22,8 +22,7 @@ try:
     )
 except ImportError as e:
     raise RuntimeError(
-        "Set UPSTOX_CLIENT_KEY, UPSTOX_CLIENT_SECRET, "
-        "UPSTOX_REDIRECT_URI in env.py"
+        "Set UPSTOX_CLIENT_KEY, UPSTOX_CLIENT_SECRET, " "UPSTOX_REDIRECT_URI in env.py"
     ) from e
 
 PAPER = True  # False = LIVE, True = paper-trade with logging
@@ -59,8 +58,7 @@ def get_access_token() -> str:
     """Get access token from file."""
     if not os.path.exists(ACCESS_TOKEN_FILE):
         raise RuntimeError(
-            "Run your Upstox auth script once to create "
-            "upstox_access_token.txt"
+            "Run your Upstox auth script once to create " "upstox_access_token.txt"
         )
     with open(ACCESS_TOKEN_FILE, "r", encoding="utf-8") as f:
         token = f.read().strip()
@@ -405,16 +403,10 @@ def detect_trend(df: pd.DataFrame) -> int:
 
         # FIRST ALIGNMENT: current align + previous NOT aligned
         if all_bull and not prev_all_bull:
-            print(
-                f"FIRST BULLISH: 10,1={dir_10_1} 11,2={dir_11_2} "
-                f"12,3={dir_12_3}"
-            )
+            print(f"FIRST BULLISH: 10,1={dir_10_1} 11,2={dir_11_2} " f"12,3={dir_12_3}")
             return 1
         elif all_bear and not prev_all_bear:
-            print(
-                f"FIRST BEARISH: 10,1={dir_10_1} 11,2={dir_11_2} "
-                f"12,3={dir_12_3}"
-            )
+            print(f"FIRST BEARISH: 10,1={dir_10_1} 11,2={dir_11_2} " f"12,3={dir_12_3}")
             return -1
     else:
         # First candle ever - treat as signal
@@ -482,9 +474,7 @@ def get_option_ltp(instrument_key: str) -> float:
     return item.get("last_price") or item.get("ltp")
 
 
-def place_hft_market_order(
-    instrument_token: str, quantity: int, side: str
-) -> str:
+def place_hft_market_order(instrument_token: str, quantity: int, side: str) -> str:
     url = f"{BASE_HFT}/order/place"
     payload = {
         "quantity": quantity,
@@ -527,9 +517,7 @@ def place_hft_limit_order(
     if PAPER:
         print("[PAPER] LIMIT:", payload)
         return f"PAPER-LMT-{side}-{int(time.time())}"
-    r = requests.post(
-        f"{BASE_HFT}/order/place", headers=hft_headers(), json=payload
-    )
+    r = requests.post(f"{BASE_HFT}/order/place", headers=hft_headers(), json=payload)
     print("LIMIT status:", r.status_code, r.text[:200])
     r.raise_for_status()
     return r.json()["data"]["order_id"]
@@ -558,9 +546,7 @@ def place_hft_sl_order(
     if PAPER:
         print("[PAPER] SL:", payload)
         return f"PAPER-SL-{side}-{int(time.time())}"
-    r = requests.post(
-        f"{BASE_HFT}/order/place", headers=hft_headers(), json=payload
-    )
+    r = requests.post(f"{BASE_HFT}/order/place", headers=hft_headers(), json=payload)
     print("SL status:", r.status_code, r.text[:200])
     r.raise_for_status()
     return r.json()["data"]["order_id"]
@@ -586,9 +572,7 @@ def check_margin_for_order(instrument_key: str) -> bool:
     margin_needed = get_option_margin_estimate(instrument_key, QTY)
     available = get_account_margin()
 
-    print(
-        f"Margin check: Available ₹{available:,.0f} | Needed ₹{margin_needed:,.0f}"
-    )
+    print(f"Margin check: Available ₹{available:,.0f} | Needed ₹{margin_needed:,.0f}")
 
     if available < margin_needed * 1.1:  # 10% buffer
         print("❌ INSUFFICIENT MARGIN")
@@ -713,9 +697,7 @@ def dashboard() -> None:
 
     print(f"Open MTM : {total_mtm:.0f}")
     print(f"Daily P&L: {daily_pnl:.0f}")
-    print(
-        "======================================================================"
-    )
+    print("======================================================================")
 
 
 def run_once() -> None:
@@ -737,9 +719,7 @@ def run_once() -> None:
     ce_map, pe_map, expiry = build_strike_maps(contracts)
     print("Using expiry:", expiry)
 
-    inst_key, opt_type, strike = pick_instrument_for_trend(
-        trend, spot, ce_map, pe_map
-    )
+    inst_key, opt_type, strike = pick_instrument_for_trend(trend, spot, ce_map, pe_map)
     if not inst_key:
         print("No option instrument selected.")
         return

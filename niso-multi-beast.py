@@ -73,9 +73,7 @@ def calculate_vwap_signals(df):
         return df
 
     typical_price = (df["high"] + df["low"] + df["close"]) / 3
-    df["vwap"] = (typical_price * df["volume"]).cumsum() / df[
-        "volume"
-    ].cumsum()
+    df["vwap"] = (typical_price * df["volume"]).cumsum() / df["volume"].cumsum()
     df["price_above_vwap"] = df["close"] > df["vwap"]
     df["price_below_vwap"] = df["close"] < df["vwap"]
     df["vwap_rising"] = df["vwap"] > df["vwap"].shift(1)
@@ -113,15 +111,11 @@ def add_supertrend(df, atr_period=10, multiplier=3.0):
 
         if in_uptrend[-1]:
             supertrend[i] = lowerband[i]
-            if supertrend[i] > supertrend[i - 1] and not np.isnan(
-                supertrend[i - 1]
-            ):
+            if supertrend[i] > supertrend[i - 1] and not np.isnan(supertrend[i - 1]):
                 supertrend[i] = supertrend[i - 1]
         else:
             supertrend[i] = upperband[i]
-            if supertrend[i] < supertrend[i - 1] and not np.isnan(
-                supertrend[i - 1]
-            ):
+            if supertrend[i] < supertrend[i - 1] and not np.isnan(supertrend[i - 1]):
                 supertrend[i] = supertrend[i - 1]
 
     df["supertrend"] = supertrend
@@ -200,9 +194,7 @@ def detect_multi_trend(df):
     signals = []
 
     # 1. EMA Crossover
-    ema_bull = (
-        latest["ema9"] > latest["ema15"] and prev["ema9"] <= prev["ema15"]
-    )
+    ema_bull = latest["ema9"] > latest["ema15"] and prev["ema9"] <= prev["ema15"]
     if ema_bull:
         signals.append(1)
     elif latest["ema9"] < latest["ema15"] and prev["ema9"] >= prev["ema15"]:
@@ -215,15 +207,9 @@ def detect_multi_trend(df):
         signals.append(-1)
 
     # 3. SuperTrend
-    if (
-        latest["close"] > latest["supertrend"]
-        and prev["close"] <= prev["supertrend"]
-    ):
+    if latest["close"] > latest["supertrend"] and prev["close"] <= prev["supertrend"]:
         signals.append(1)
-    elif (
-        latest["close"] < latest["supertrend"]
-        and prev["close"] >= prev["supertrend"]
-    ):
+    elif latest["close"] < latest["supertrend"] and prev["close"] >= prev["supertrend"]:
         signals.append(-1)
 
     # 4. Parabolic SAR
@@ -336,9 +322,7 @@ def ensure_log_files():
     PAPER_LOG_DIR.mkdir(parents=True, exist_ok=True)
 
     lifetime_file = PAPER_LOG_DIR / "lifetime-multi-beast_log.csv"
-    today_file = (
-        PAPER_LOG_DIR / f"{datetime.now().date()}_multi-beast-trades.csv"
-    )
+    today_file = PAPER_LOG_DIR / f"{datetime.now().date()}_multi-beast-trades.csv"
 
     header = [
         "timestamp",
@@ -542,12 +526,8 @@ def build_strike_maps(contracts):
     print(f"CE contracts: {len(ce_df)}, PE contracts: {len(pe_df)}")
 
     # Build strike maps
-    ce_map = dict(
-        zip(ce_df["strike_price"].astype(float), ce_df["instrument_key"])
-    )
-    pe_map = dict(
-        zip(pe_df["strike_price"].astype(float), pe_df["instrument_key"])
-    )
+    ce_map = dict(zip(ce_df["strike_price"].astype(float), ce_df["instrument_key"]))
+    pe_map = dict(zip(pe_df["strike_price"].astype(float), pe_df["instrument_key"]))
 
     return ce_map, pe_map, nearest_expiry
 
@@ -650,9 +630,7 @@ def place_hft_limit_order(instrument_token, quantity, side, price):
     if PAPER:
         print("[PAPER] LIMIT:", payload)
         return f"PAPER-LMT-{side}-{int(time.time())}"
-    r = requests.post(
-        f"{BASE_HFT}/order/place", headers=hft_headers(), json=payload
-    )
+    r = requests.post(f"{BASE_HFT}/order/place", headers=hft_headers(), json=payload)
     print("LIMIT status:", r.status_code, r.text[:200])
     r.raise_for_status()
     return r.json()["data"]["order_id"]
@@ -676,9 +654,7 @@ def place_hft_sl_order(instrument_token, quantity, side, price, trigger_price):
     if PAPER:
         print("[PAPER] SL:", payload)
         return f"PAPER-SL-{side}-{int(time.time())}"
-    r = requests.post(
-        f"{BASE_HFT}/order/place", headers=hft_headers(), json=payload
-    )
+    r = requests.post(f"{BASE_HFT}/order/place", headers=hft_headers(), json=payload)
     print("SL status:", r.status_code, r.text[:200])
     r.raise_for_status()
     return r.json()["data"]["order_id"]
@@ -799,8 +775,7 @@ def dashboard():
     os.system("cls" if os.name == "nt" else "clear")
     print("🎯 HA-V2 TREND BREAKOUT BEAST –", "PAPER" if PAPER else "LIVE")
     print(
-        f"Time: {datetime.now().strftime('%H:%M:%S')} | "
-        f"Open: {len(open_positions)}"
+        f"Time: {datetime.now().strftime('%H:%M:%S')} | " f"Open: {len(open_positions)}"
     )
 
     if open_positions:
@@ -867,9 +842,7 @@ def run_once():
     ce_map, pe_map, expiry = build_strike_maps(contracts)
     print("Using expiry:", expiry)
 
-    inst_key, opt_type, strike = pick_instrument_for_trend(
-        trend, spot, ce_map, pe_map
-    )
+    inst_key, opt_type, strike = pick_instrument_for_trend(trend, spot, ce_map, pe_map)
     if not inst_key:
         print("No option instrument selected.")
         return

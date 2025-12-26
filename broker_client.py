@@ -29,9 +29,7 @@ class BrokerClient:
             raise RuntimeError(
                 f"{access_token_path} not found. Run upstox_auth.py to generate access token."
             )
-        self.access_tok = (
-            open(access_token_path, "r", encoding="utf-8").read().strip()
-        )
+        self.access_tok = open(access_token_path, "r", encoding="utf-8").read().strip()
 
     # ---------- headers ---------------------------------------------------
     def _headers(self):
@@ -127,9 +125,7 @@ class PaperBroker:
     def place_order(self, instrument_token, quantity, side):
         side = side.upper()
         oid = self._next_oid()
-        print(
-            f"[PAPER] Placing {side} {quantity} of {instrument_token}, oid={oid}"
-        )
+        print(f"[PAPER] Placing {side} {quantity} of {instrument_token}, oid={oid}")
         self.orderbook[oid] = {
             "symbol": instrument_token,
             "qty": quantity,

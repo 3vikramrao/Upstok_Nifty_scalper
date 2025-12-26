@@ -419,9 +419,7 @@ def detect_trend(df):
     bear_confirmed = (st_dir == -1) and not ema_bull and rsi_mom_bear
 
     print("\n=== TRIPLE CONFIRMATION ===")
-    print(
-        f"SuperTrend: {'🟢' if st_dir == 1 else '🔴' if st_dir == -1 else '⚪'}"
-    )
+    print(f"SuperTrend: {'🟢' if st_dir == 1 else '🔴' if st_dir == -1 else '⚪'}")
     print(f"EMA Cross: {'🟢' if ema_bull else '🔴'}")
     print(
         f"RSI Mom: {'🟢' if rsi_mom_bull else '🔴' if rsi_mom_bear else '⚪'} "
@@ -524,9 +522,7 @@ def place_hft_limit_order(instrument_token, quantity, side, price):
     if PAPER:
         print("[PAPER] LIMIT:", payload)
         return f"PAPER-LMT-{side}-{int(time.time())}"
-    r = requests.post(
-        f"{BASE_HFT}/order/place", headers=hft_headers(), json=payload
-    )
+    r = requests.post(f"{BASE_HFT}/order/place", headers=hft_headers(), json=payload)
     print("LIMIT status:", r.status_code, r.text[:200])
     r.raise_for_status()
     return r.json()["data"]["order_id"]
@@ -550,9 +546,7 @@ def place_hft_sl_order(instrument_token, quantity, side, price, trigger_price):
     if PAPER:
         print("[PAPER] SL:", payload)
         return f"PAPER-SL-{side}-{int(time.time())}"
-    r = requests.post(
-        f"{BASE_HFT}/order/place", headers=hft_headers(), json=payload
-    )
+    r = requests.post(f"{BASE_HFT}/order/place", headers=hft_headers(), json=payload)
     print("SL status:", r.status_code, r.text[:200])
     r.raise_for_status()
     return r.json()["data"]["order_id"]
@@ -738,9 +732,7 @@ def run_once():
     ce_map, pe_map, expiry = build_strike_maps(contracts)
     print("Using expiry:", expiry)
 
-    inst_key, opt_type, strike = pick_instrument_for_trend(
-        trend, spot, ce_map, pe_map
-    )
+    inst_key, opt_type, strike = pick_instrument_for_trend(trend, spot, ce_map, pe_map)
     if not inst_key:
         print("No option instrument selected.")
         return

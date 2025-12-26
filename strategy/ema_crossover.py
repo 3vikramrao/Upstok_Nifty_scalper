@@ -18,12 +18,8 @@ def run_strategy(nifty):
     nifty["Fast_EMA"] = fast_ema
     nifty["Slow_EMA"] = slow_ema
 
-    crossover_up = (fast_ema > slow_ema) & (
-        fast_ema.shift(1) <= slow_ema.shift(1)
-    )
-    crossover_down = (fast_ema < slow_ema) & (
-        fast_ema.shift(1) >= slow_ema.shift(1)
-    )
+    crossover_up = (fast_ema > slow_ema) & (fast_ema.shift(1) <= slow_ema.shift(1))
+    crossover_down = (fast_ema < slow_ema) & (fast_ema.shift(1) >= slow_ema.shift(1))
 
     confirmation_long = nifty["Close"] > nifty["Open"]
     confirmation_short = nifty["Close"] < nifty["Open"]

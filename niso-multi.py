@@ -155,12 +155,8 @@ def detect_multi_trend(df):
     signals = []
 
     # 1. EMA 9/15 crossover
-    ema_bull = (
-        latest["ema9"] > latest["ema15"] and prev["ema9"] <= prev["ema15"]
-    )
-    ema_bear = (
-        latest["ema9"] < latest["ema15"] and prev["ema9"] >= prev["ema15"]
-    )
+    ema_bull = latest["ema9"] > latest["ema15"] and prev["ema9"] <= prev["ema15"]
+    ema_bear = latest["ema9"] < latest["ema15"] and prev["ema9"] >= prev["ema15"]
     if ema_bull:
         signals.append(1)
     elif ema_bear:
@@ -175,15 +171,9 @@ def detect_multi_trend(df):
         signals.append(-1)
 
     # 3. SuperTrend
-    if (
-        latest["close"] > latest["supertrend"]
-        and prev["close"] <= prev["supertrend"]
-    ):
+    if latest["close"] > latest["supertrend"] and prev["close"] <= prev["supertrend"]:
         signals.append(1)
-    elif (
-        latest["close"] < latest["supertrend"]
-        and prev["close"] >= prev["supertrend"]
-    ):
+    elif latest["close"] < latest["supertrend"] and prev["close"] >= prev["supertrend"]:
         signals.append(-1)
 
     # 4. Parabolic SAR
@@ -544,9 +534,7 @@ def place_hft_limit_order(instrument_token, quantity, side, price):
     if PAPER:
         print("[PAPER] LIMIT:", payload)
         return f"PAPER-LMT-{side}-{int(time.time())}"
-    r = requests.post(
-        f"{BASE_HFT}/order/place", headers=hft_headers(), json=payload
-    )
+    r = requests.post(f"{BASE_HFT}/order/place", headers=hft_headers(), json=payload)
     print("LIMIT status:", r.status_code, r.text[:200])
     r.raise_for_status()
     return r.json()["data"]["order_id"]
@@ -570,9 +558,7 @@ def place_hft_sl_order(instrument_token, quantity, side, price, trigger_price):
     if PAPER:
         print("[PAPER] SL:", payload)
         return f"PAPER-SL-{side}-{int(time.time())}"
-    r = requests.post(
-        f"{BASE_HFT}/order/place", headers=hft_headers(), json=payload
-    )
+    r = requests.post(f"{BASE_HFT}/order/place", headers=hft_headers(), json=payload)
     print("SL status:", r.status_code, r.text[:200])
     r.raise_for_status()
     return r.json()["data"]["order_id"]
@@ -766,9 +752,7 @@ def run_once():
     ce_map, pe_map, expiry = build_strike_maps(contracts)
     print("Using expiry:", expiry)
 
-    inst_key, opt_type, strike = pick_instrument_for_trend(
-        trend, spot, ce_map, pe_map
-    )
+    inst_key, opt_type, strike = pick_instrument_for_trend(trend, spot, ce_map, pe_map)
     if not inst_key:
         print("No option instrument selected.")
         return

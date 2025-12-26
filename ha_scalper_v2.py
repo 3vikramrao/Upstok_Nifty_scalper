@@ -61,12 +61,12 @@ def heikin_ashi(df):
     ha["ha_open"] = (
         ha["ha_open"].fillna(method="bfill").fillna(ha["ha_close"])
     )  # Fixed deprecated bfill
-    ha["ha_high"] = pd.concat(
-        [ha["high"], ha["ha_open"], ha["ha_close"]], axis=1
-    ).max(axis=1)
-    ha["ha_low"] = pd.concat(
-        [ha["low"], ha["ha_open"], ha["ha_close"]], axis=1
-    ).min(axis=1)
+    ha["ha_high"] = pd.concat([ha["high"], ha["ha_open"], ha["ha_close"]], axis=1).max(
+        axis=1
+    )
+    ha["ha_low"] = pd.concat([ha["low"], ha["ha_open"], ha["ha_close"]], axis=1).min(
+        axis=1
+    )
     return ha
 
 
@@ -113,9 +113,7 @@ def detect_ha_v2_trend(df):
     signals.append(1 if latest["ha_green"] else -1)
 
     # 2. CCI
-    signals.append(
-        1 if latest["cci"] > 100 else -1 if latest["cci"] < -100 else 0
-    )
+    signals.append(1 if latest["cci"] > 100 else -1 if latest["cci"] < -100 else 0)
 
     # 3. Keltner Channel
     signals.append(
@@ -139,9 +137,7 @@ def detect_ha_v2_trend(df):
         else -1 if latest["tsi"] < 0 and latest["tsi"] < prev["tsi"] else 0
     )
 
-    bull, bear = sum(1 for s in signals if s == 1), sum(
-        1 for s in signals if s == -1
-    )
+    bull, bear = sum(1 for s in signals if s == 1), sum(1 for s in signals if s == -1)
 
     print(
         f"🔥 V2 TREND: Bull={bull}/5 Bear={bear}/5 | CCI={latest['cci']:.0f} ADX={latest['adx']:.1f}"
@@ -180,9 +176,7 @@ def ensure_log_files():
     PAPER_LOG_DIR.mkdir(parents=True, exist_ok=True)
 
     lifetime_file = PAPER_LOG_DIR / "lifetime-ha_scalper_v2_log.csv"
-    today_file = (
-        PAPER_LOG_DIR / f"{datetime.now().date()}_ha_scalper_v2-trades.csv"
-    )
+    today_file = PAPER_LOG_DIR / f"{datetime.now().date()}_ha_scalper_v2-trades.csv"
 
     header = [
         "timestamp",
@@ -280,17 +274,13 @@ def get_nifty_ltp():
         params={"instrument_key": NIFTY_SPOT_INSTRUMENT},
     )
     r.raise_for_status()
-    return r.json()["data"][NIFTY_SPOT_INSTRUMENT][
-        "ltp"
-    ]  # Fixed key format [web:27]
+    return r.json()["data"][NIFTY_SPOT_INSTRUMENT]["ltp"]  # Fixed key format [web:27]
 
 
 def get_nifty_intraday_candles(minutes_back):
     """Fixed historical candle endpoint parameters [web:1]"""
     end_time = datetime.now().strftime("%Y-%m-%d")
-    start_time = (datetime.now() - timedelta(minutes=minutes_back)).strftime(
-        "%Y-%m-%d"
-    )
+    start_time = (datetime.now() - timedelta(minutes=minutes_back)).strftime("%Y-%m-%d")
 
     url = f"{BASE_REST}/historical-candle/intraday/{NIFTY_SPOT_INSTRUMENT}/1minute"
     params = {"to": end_time, "from": start_time}
@@ -299,9 +289,7 @@ def get_nifty_intraday_candles(minutes_back):
     r.raise_for_status()
     data = r.json()["data"]["candles"]
 
-    df = pd.DataFrame(
-        data, columns=["time", "open", "high", "low", "close", "volume"]
-    )
+    df = pd.DataFrame(data, columns=["time", "open", "high", "low", "close", "volume"])
     df["time"] = pd.to_datetime(df["time"])
     df[["open", "high", "low", "close", "volume"]] = df[
         ["open", "high", "low", "close", "volume"]
@@ -417,9 +405,7 @@ def place_hft_limit_order(instrument_token, quantity, side, price):
     if PAPER:
         print("[PAPER] LIMIT:", payload)
         return f"PAPER-LMT-{side}-{int(time.time())}"
-    r = requests.post(
-        f"{BASE_HFT}/order/place", headers=hft_headers(), json=payload
-    )
+    r = requests.post(f"{BASE_HFT}/order/place", headers=hft_headers(), json=payload)
     print("LIMIT status:", r.status_code, r.text[:200])
     r.raise_for_status()
     return r.json()["data"]["order_id"]
@@ -442,9 +428,7 @@ def place_hft_sl_order(instrument_token, quantity, side, price, trigger_price):
     if PAPER:
         print("[PAPER] SL:", payload)
         return f"PAPER-SL-{side}-{int(time.time())}"
-    r = requests.post(
-        f"{BASE_HFT}/order/place", headers=hft_headers(), json=payload
-    )
+    r = requests.post(f"{BASE_HFT}/order/place", headers=hft_headers(), json=payload)
     print("SL status:", r.status_code, r.text[:200])
     r.raise_for_status()
     return r.json()["data"]["order_id"]
@@ -459,9 +443,7 @@ def now_iso():
 
 def log_trade_row(row):
     PAPER_LOG_DIR.mkdir(exist_ok=True)
-    filename = (
-        PAPER_LOG_DIR / f"trades_{datetime.now().strftime('%Y%m%d')}.csv"
-    )
+    filename = PAPER_LOG_DIR / f"trades_{datetime.now().strftime('%Y%m%d')}.csv"
     file_exists = filename.exists()
     with open(filename, "a", newline="") as f:
         writer = csv.writer(f)
@@ -554,9 +536,7 @@ def monitor_positions():
             pnl = (exit_ltp - pos.entry_price) * pos.qty
             daily_pnl += pnl
 
-            r = {"SL_HIT": "EXIT_SL", "TARGET": "EXIT_TARGET"}.get(
-                reason, "EXIT"
-            )
+            r = {"SL_HIT": "EXIT_SL", "TARGET": "EXIT_TARGET"}.get(reason, "EXIT")
 
             row = [
                 now_iso(),
@@ -607,9 +587,7 @@ def run_once():
         df = v2_indicators(df)
         trend = detect_ha_v2_trend(df)
 
-        if (
-            trend != 0 and len(open_positions) == 0
-        ):  # Only trade if no position
+        if trend != 0 and len(open_positions) == 0:  # Only trade if no position
             print(f"🚀 HA-V2 SIGNAL: {'🟢 CE' if trend == 1 else '🔴 PE'}")
 
             # Get option contracts

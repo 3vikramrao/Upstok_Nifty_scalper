@@ -23,8 +23,7 @@ REDIRECT_URI = UPSTOX_CLIENT_SECRET
 
 if not CLIENT_ID or not CLIENT_SECRET or not REDIRECT_URI:
     raise RuntimeError(
-        "Set UPSTOX_CLIENT_KEY, UPSTOX_CLIENT_SECRET, "
-        "UPSTOX_REDIRECT_URI in env.py"
+        "Set UPSTOX_CLIENT_KEY, UPSTOX_CLIENT_SECRET, " "UPSTOX_REDIRECT_URI in env.py"
     )
 
 ACCESS_TOKEN_FILE = "upstox_access_token.txt"
@@ -47,8 +46,6 @@ UPSTOX_API_VERSION = "2.0"
 def get_access_token():
     """Read Upstox access token."""
     if not os.path.exists(ACCESS_TOKEN_FILE):
-        raise RuntimeError(
-            "Run Upstox auth script to create upstox_access_token.txt"
-        )
-    with open(ACCESS_TOKEN_FILE, "r", encoding="utf-8"):
-        token
+        raise RuntimeError("Run Upstox auth script to create upstox_access_token.txt")
+    with open(ACCESS_TOKEN_FILE, "r", encoding="utf-8") as f:
+        token = f.read().strip()

@@ -77,9 +77,7 @@ def ensure_log_files():
     PAPER_LOG_DIR.mkdir(parents=True, exist_ok=True)
 
     lifetime_file = PAPER_LOG_DIR / "lifetime-ema915rsi9_log.csv"
-    today_file = (
-        PAPER_LOG_DIR / f"{datetime.now().date()}_ema915rsi9-trades.csv"
-    )
+    today_file = PAPER_LOG_DIR / f"{datetime.now().date()}_ema915rsi9-trades.csv"
 
     header = [
         "timestamp",
@@ -300,9 +298,7 @@ def detect_trend(df):
     rsi_bull = df["mom_up"].iloc[-1] or df["mom_up_strong"].iloc[-1]
     rsi_bear = df["mom_dn"].iloc[-1] or df["mom_dn_strong"].iloc[-1]
 
-    print(
-        f"📊 EMA9={ema9:.1f} EMA15={ema15:.1f} | RSI={df['rsi'].iloc[-1]:.1f}"
-    )
+    print(f"📊 EMA9={ema9:.1f} EMA15={ema15:.1f} | RSI={df['rsi'].iloc[-1]:.1f}")
     print(
         f"🎯 EMA: {'🟢' if ema_bull else '🔴' if ema_bear else '⚪'} | RSI: {'🟢' if rsi_bull else '🔴' if rsi_bear else '⚪'}"
     )
@@ -403,17 +399,11 @@ def compute_momentum_bars(
     ema_rsi = df["rsi_ema3"]
 
     df["mom_up"] = ((rsi_series > ema_rsi) & (rsi_series > wma)).fillna(False)
-    df["mom_up_strong"] = ((rsi_series > wma) & (rsi_series > 50)).fillna(
-        False
-    )
+    df["mom_up_strong"] = ((rsi_series > wma) & (rsi_series > 50)).fillna(False)
     df["mom_dn"] = ((rsi_series < ema_rsi) & (rsi_series < wma)).fillna(False)
-    df["mom_dn_strong"] = ((rsi_series < wma) & (rsi_series < 40)).fillna(
-        False
-    )
+    df["mom_dn_strong"] = ((rsi_series < wma) & (rsi_series < 40)).fillna(False)
 
-    bar_color = np.where(
-        df["mom_up"], "green", np.where(df["mom_dn"], "red", "white")
-    )
+    bar_color = np.where(df["mom_up"], "green", np.where(df["mom_dn"], "red", "white"))
     df["bar_color"] = bar_color if mo_bars_on else None
 
     return df
@@ -475,9 +465,7 @@ def place_hft_limit_order(instrument_token, quantity, side, price):
     if PAPER:
         print("[PAPER] LIMIT:", payload)
         return f"PAPER-LMT-{side}-{int(time.time())}"
-    r = requests.post(
-        f"{BASE_HFT}/order/place", headers=hft_headers(), json=payload
-    )
+    r = requests.post(f"{BASE_HFT}/order/place", headers=hft_headers(), json=payload)
     print("LIMIT status:", r.status_code, r.text[:200])
     r.raise_for_status()
     return r.json()["data"]["order_id"]
@@ -500,9 +488,7 @@ def place_hft_sl_order(instrument_token, quantity, side, price, trigger_price):
     if PAPER:
         print("[PAPER] SL:", payload)
         return f"PAPER-SL-{side}-{int(time.time())}"
-    r = requests.post(
-        f"{BASE_HFT}/order/place", headers=hft_headers(), json=payload
-    )
+    r = requests.post(f"{BASE_HFT}/order/place", headers=hft_headers(), json=payload)
     print("SL status:", r.status_code, r.text[:200])
     r.raise_for_status()
     return r.json()["data"]["order_id"]
@@ -680,9 +666,7 @@ def run_once():
     ce_map, pe_map, expiry = build_strike_maps(contracts)
     print("Using expiry:", expiry)
 
-    inst_key, opt_type, strike = pick_instrument_for_trend(
-        trend, spot, ce_map, pe_map
-    )
+    inst_key, opt_type, strike = pick_instrument_for_trend(trend, spot, ce_map, pe_map)
     if not inst_key:
         print("No option instrument selected.")
         return

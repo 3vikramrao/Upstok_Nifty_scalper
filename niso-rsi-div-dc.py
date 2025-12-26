@@ -35,8 +35,7 @@ REDIRECT_URI = UPSTOX_REDIRECT_URI
 
 if not CLIENT_ID or not CLIENT_SECRET or not REDIRECT_URI:
     raise RuntimeError(
-        "Set UPSTOX_CLIENT_KEY, UPSTOX_CLIENT_SECRET, "
-        "UPSTOX_REDIRECT_URI in env.py"
+        "Set UPSTOX_CLIENT_KEY, UPSTOX_CLIENT_SECRET, " "UPSTOX_REDIRECT_URI in env.py"
     )
 
 ACCESS_TOKEN_FILE = "upstox_access_token.txt"
@@ -60,8 +59,7 @@ def get_access_token():
     """Read access token from file."""
     if not os.path.exists(ACCESS_TOKEN_FILE):
         raise RuntimeError(
-            "Run your Upstox auth script once to create "
-            "upstox_access_token.txt"
+            "Run your Upstox auth script once to create " "upstox_access_token.txt"
         )
     with open(ACCESS_TOKEN_FILE, "r", encoding="utf-8") as f:
         token = f.read().strip()
@@ -107,9 +105,7 @@ def ensure_log_files():
     PAPER_LOG_DIR.mkdir(parents=True, exist_ok=True)
 
     lifetime_file = PAPER_LOG_DIR / "lifetime-rsi-div-dc_log.csv"
-    today_file = (
-        PAPER_LOG_DIR / f"{datetime.now().date()}_rsi-div-dc-trades.csv"
-    )
+    today_file = PAPER_LOG_DIR / f"{datetime.now().date()}_rsi-div-dc-trades.csv"
 
     header = [
         "timestamp",

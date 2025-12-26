@@ -122,24 +122,18 @@ def get_auth_code() -> str:
         # 3) Enter TOTP (OTP)
         totp = pyotp.TOTP(TOTP_SECRET).now()
         time.sleep(2)
-        otp_field = wait.until(
-            EC.presence_of_element_located((By.ID, "otpNum"))
-        )
+        otp_field = wait.until(EC.presence_of_element_located((By.ID, "otpNum")))
         otp_field.clear()
         otp_field.send_keys(totp)
         print("TOTP entered")
 
-        cont_otp_btn = wait.until(
-            EC.element_to_be_clickable((By.ID, "continueBtn"))
-        )
+        cont_otp_btn = wait.until(EC.element_to_be_clickable((By.ID, "continueBtn")))
         cont_otp_btn.click()
         print("Clicked Continue after OTP")
 
         # 4) Enter PIN
         time.sleep(2)
-        pin_field = wait.until(
-            EC.presence_of_element_located((By.ID, "pinCode"))
-        )
+        pin_field = wait.until(EC.presence_of_element_located((By.ID, "pinCode")))
         pin_field.clear()
         pin_field.send_keys(PIN_CODE)
         print("PIN entered")
@@ -226,9 +220,7 @@ def main() -> None:
 
     print(f"Access token saved to {out_file}.")
     print("=" * 55)
-    print(
-        "Upstox access tokens expire daily; " "rerun this script when needed."
-    )
+    print("Upstox access tokens expire daily; " "rerun this script when needed.")
     print("=" * 55)
 
 

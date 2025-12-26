@@ -31,8 +31,7 @@ REDIRECT_URI = UPSTOX_REDIRECT_URI
 
 if not CLIENT_ID or not CLIENT_SECRET or not REDIRECT_URI:
     raise RuntimeError(
-        "Set UPSTOX_CLIENT_KEY, UPSTOX_CLIENT_SECRET, "
-        "UPSTOX_REDIRECT_URI in env.py"
+        "Set UPSTOX_CLIENT_KEY, UPSTOX_CLIENT_SECRET, " "UPSTOX_REDIRECT_URI in env.py"
     )
 
 ACCESS_TOKEN_FILE = "upstox_access_token.txt"
@@ -58,9 +57,7 @@ UPSTOX_API_VERSION = "2.0"
 def get_access_token():
     """Read Upstox access token from file."""
     if not os.path.exists(ACCESS_TOKEN_FILE):
-        raise RuntimeError(
-            "Run Upstox auth script to create upstox_access_token.txt"
-        )
+        raise RuntimeError("Run Upstox auth script to create upstox_access_token.txt")
     with open(ACCESS_TOKEN_FILE, "r", encoding="utf-8") as f:
         token = f.read().strip()
     if not token:
@@ -70,7 +67,10 @@ def get_access_token():
 
 def api_headers():
     """REST API headers."""
-    return {"Authorization": f"Bearer {get_access_token()}", "accept": "application/json"}
+    return {
+        "Authorization": f"Bearer {get_access_token()}",
+        "accept": "application/json",
+    }
 
 
 def hft_headers():
@@ -262,14 +262,14 @@ def calculate_volume_profile(df, rows=VP_ROWS):
     if len(df) < 20:
         return None
 
-    price_min = df['low'].min()
-    price_max = df['high'].max()
+    price_min = df["low"].min()
+    price_max = df["high"].max()
     bin_size = (price_max - price_min) / rows
 
     bins = np.arange(price_min, price_max + bin_size, bin_size)
-    df['price_bin'] = np.digitize(df[['low', 'high']].mean(axis=1), bins)
+    df["price_bin"] = np.digitize(df[["low", "high"]].mean(axis=1), bins)
 
-    vp = df.groupby('price_bin')['volume'].sum().sort_index()
+    vp = df.groupby("price_bin")["volume"].sum().sort_index()
     if vp.empty:
         return None
 
@@ -294,11 +294,11 @@ def calculate_volume_profile(df, rows=VP_ROWS):
     val_price = bins[min(value_area_bins)]
 
     return {
-        'poc': poc_price,
-        'vah': vah_price,
-        'val': val_price,
-        'total_vol': total_vol,
-        'bin_size': bin_size
+        "poc": poc_price,
+        "vah": vah_price,
+        "val": val_price,
+        "total_vol": total_vol,
+        "bin_size": bin_size,
     }
 
 

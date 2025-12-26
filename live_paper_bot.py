@@ -51,9 +51,7 @@ class PaperTrader:
         nifty_key = "NSE_INDEX|Nifty 50"
         history_api = upstox_client.api.HistoryApi(self.api_client)
 
-        from_date = (datetime.now() - timedelta(days=days_back)).strftime(
-            "%Y-%m-%d"
-        )
+        from_date = (datetime.now() - timedelta(days=days_back)).strftime("%Y-%m-%d")
         candles_response = history_api.get_historical_candle_data(
             nifty_key, "1minute", from_date, "v2"
         )
@@ -88,9 +86,7 @@ class PaperTrader:
         df["timestamp"] = pd.to_datetime(df["timestamp"], errors="coerce")
         df.set_index("timestamp", inplace=True)
         df.columns = ["Open", "High", "Low", "Close", "Volume"]
-        df["Volume"] = pd.to_numeric(df["Volume"], errors="coerce").fillna(
-            1000
-        )
+        df["Volume"] = pd.to_numeric(df["Volume"], errors="coerce").fillna(1000)
 
         self.last_nifty_price = float(df["Close"].iloc[-1])
         return df.dropna()
@@ -127,9 +123,7 @@ class PaperTrader:
             print(f"⚠️  Create: {strategy_path}")
             return
 
-        spec = importlib.util.spec_from_file_location(
-            "strategy", strategy_path
-        )
+        spec = importlib.util.spec_from_file_location("strategy", strategy_path)
         module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)
 
@@ -146,9 +140,7 @@ class PaperTrader:
 def main():
     """Main trading loop."""
     parser = argparse.ArgumentParser(description="🚀 LIVE Upstox Nifty Bot")
-    parser.add_argument(
-        "--strategy", "-s", required=True, choices=STRATEGY_LIST
-    )
+    parser.add_argument("--strategy", "-s", required=True, choices=STRATEGY_LIST)
     parser.add_argument("--duration", "-t", default=1800, type=int)  # 30min
     args = parser.parse_args()
 

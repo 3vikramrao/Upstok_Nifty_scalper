@@ -23,11 +23,7 @@ def load_strategy(strategy_name):
     if not strategy_path.exists():
         print(
             "Available:",
-            [
-                f.stem
-                for f in strategy_dir.glob("*.py")
-                if f.stem != "__init__"
-            ],
+            [f.stem for f in strategy_dir.glob("*.py") if f.stem != "__init__"],
         )
         sys.exit(1)
 
@@ -86,9 +82,7 @@ def run_backtest(args):
     nifty["Strategy"] = nifty["Position"].shift(1) * nifty["Returns"]
 
     # FIXED METRICS
-    total_trades = len(nifty[nifty["Long_Signal"]]) + len(
-        nifty[nifty["Short_Signal"]]
-    )
+    total_trades = len(nifty[nifty["Long_Signal"]]) + len(nifty[nifty["Short_Signal"]])
     total_return = (1 + nifty["Strategy"].dropna()).prod() - 1
 
     print(f"\n🎉 RESULTS: {total_return:.2%} return, {total_trades} trades")

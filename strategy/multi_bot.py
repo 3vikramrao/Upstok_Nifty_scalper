@@ -43,8 +43,7 @@ def ensemble_signal(df, strategies=STRATEGIES):
     df["Short_Signal"] = all_short_signals
 
     print(
-        f"✅ MultiBot: {all_long_signals.sum()}L "
-        f"{all_short_signals.sum()}S total"
+        f"✅ MultiBot: {all_long_signals.sum()}L " f"{all_short_signals.sum()}S total"
     )
 
     return df
