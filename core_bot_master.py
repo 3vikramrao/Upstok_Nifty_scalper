@@ -1,466 +1,179 @@
 #!/usr/bin/env python3
 """
-CORE BOT master: Run ALL Nifty Strategy + Comparison Dashboard
-Usage: python core_bot.py --days 20 --interval 15m
+NISO Core Bot Master - Run ALL Strategies Backtest + Comparison
 """
 
 import argparse
-import importlib
+import importlib.util
+import os
 import sys
 import warnings
-from datetime import datetime, timedelta
 from pathlib import Path
+from typing import Callable, Dict, List, Optional, Tuple
 
-import matplotlib.pyplot as plt
 import pandas as pd
 import yfinance as yf
+from rich.console import Console
+from rich.table import Table
 
 warnings.filterwarnings("ignore")
 
-# ALL YOUR STRATEGIES
-STRATEGY_LIST = ["ema_crossover", "crt_hourly", "vp_profile", "multi_bot"]
+console = Console()
 
 
-def parse_args():
+def parse_args() -> argparse.Namespace:
+    """Parse command line arguments."""
     parser = argparse.ArgumentParser(description="Run ALL Nifty Strategies")
     parser.add_argument("--days", "-d", type=int, default=20, help="Days of data")
-    parser.add_argument("--interval", "-i", default="15m", choices=["5m", "15m", "1h"])
-    parser.add_argument(
-        "--show-plots", action="store_true", help="Show individual charts"
-    )
+    parser.add_argument("--symbols", "-s", nargs="+", default=["^NSEI"], 
+                       help="Yahoo symbols (default: ^NSEI)")
+    parser.add_argument("--show-plots", action="store_true", help="Show comparison plots")
     return parser.parse_args()
 
 
-def load_strategy(strategy_name):
-    strategy_dir = Path("./strategy")
-    strategy_path = strategy_dir / f"{strategy_name}.py"
-
-    if not strategy_path.exists():
-        print(f"❌ Missing: {strategy_name}")
-        return None
-
-    if str(strategy_dir.parent) not in sys.path:
-        sys.path.insert(0, str(strategy_dir.parent))
-
+def load_strategy(strategy_name: str) -> Optional[Callable]:
+    """Load strategy module dynamically."""
     try:
-        module = importlib.import_module(f"strategy.{strategy_name}")
+        strategy_dir = Path("./strategy")
+        strategy_path = strategy_dir / f"{strategy_name}.py"
+        
+        if not strategy_path.exists():
+            print(f"❌ Strategy {strategy_name} not found")
+            return None
+            
+        spec = importlib.util.spec_from_file_location(strategy_name, strategy_path)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)  # type: ignore
+        
         if hasattr(module, "run_strategy"):
             return module.run_strategy
-    except:
-        pass
-    return None  #!/usr/bin/env python3
-
-
-"""
-CORE BOT: Run ALL Nifty Strategies + Comparison Dashboard
-Usage: python core_bot.py --days 20 --interval 15m
-"""
-
-import warnings
-
-
-warnings.filterwarnings("ignore")
-
-# ALL YOUR STRATEGIES
-STRATEGY_LIST = ["ema_crossover", "crt_hourly", "vp_profile", "multi_bot"]
-
-
-def parse_args():
-    parser = argparse.ArgumentParser(description="Run ALL Nifty Strategies")
-    parser.add_argument("--days", "-d", type=int, default=20, help="Days of data")
-    parser.add_argument("--interval", "-i", default="15m", choices=["5m", "15m", "1h"])
-    parser.add_argument(
-        "--show-plots", action="store_true", help="Show individual charts"
-    )
-    return parser.parse_args()
-
-
-def load_strategy(strategy_name):
-    strategy_dir = Path("./strategy")
-    strategy_path = strategy_dir / f"{strategy_name}.py"
-
-    if not strategy_path.exists():
-        print(f"❌ Missing: {strategy_name}")
-        return None
-
-    if str(strategy_dir.parent) not in sys.path:
-        sys.path.insert(0, str(strategy_dir.parent))
-
-    try:
-        module = importlib.import_module(f"strategy.{strategy_name}")
-        if hasattr(module, "run_strategy"):
-            return module.run_strategy
-    except:
-        pass
+            
+    except ImportError as e:
+        print(f"❌ Import error in {strategy_name}: {e}")
+    except Exception as e:
+        print(f"❌ Error loading {strategy_name}: {e}")
+    
     return None
 
 
-def fetch_data(days, interval):
-    """Fetch Nifty data with multiple symbol fallback"""
+def fetch_data(days: int, interval: str = "1h", symbols: List[str] = None) -> pd.DataFrame:
+    """Fetch Nifty data with multiple symbol fallback."""
+    if symbols is None:
+        symbols = ["^NSEI"]
+    
     print("📊 Fetching data...")
-    end_date = datetime.now()
-    start_date = end_date - timedelta(days=days)
-
-    symbols = ["^NSEI", "NIFTY50.NS", "BANKNIFTY.NS"]
+    
     for symbol in symbols:
         try:
-            df = yf.download(
-                symbol,
-                start=start_date,
-                end=end_date,
-                interval=interval,
-                progress=False,
-            )
-            if len(df) > 50:
-                if isinstance(df.columns, pd.MultiIndex):
-                    df.columns = [
-                        col[0] if isinstance(col, tuple) else col for col in df.columns
-                    ]
-                df = df.dropna()
+            df = yf.download(symbol, period=f"{days}d", interval=interval, progress=False)
+            if not df.empty and len(df) >= 50:
+                df.columns = df.columns.get_level_values(0)  # Flatten MultiIndex
                 print(f"✅ {symbol}: {len(df)} candles")
-                return df
-        except:
+                return df.reset_index()
+        except Exception:
             continue
+    
+    raise RuntimeError("Failed to fetch data from all symbols")
 
-    print("❌ No data found!")
-    sys.exit(1)
 
-
-def backtest_strategy(df, strategy_func, name):
-    """Run single strategy backtest"""
+def backtest_strategy(df: pd.DataFrame, strategy_func: Callable, name: str) -> Dict:
+    """Run single strategy backtest."""
     try:
-        df_signals = strategy_func(df.copy())
-
-        # Position logic
-        position = 0
-        positions = [0] * len(df_signals)
-        for i in range(1, len(df_signals)):
-            if df_signals["Long_Signal"].iloc[i] and position != 1:
-                position = 1
-            elif df_signals["Short_Signal"].iloc[i] and position != -1:
-                position = -1
-            elif (df_signals["Short_Signal"].iloc[i] and position == 1) or (
-                df_signals["Long_Signal"].iloc[i] and position == -1
-            ):
-                position = 0
-            positions[i] = position
-
-        df_signals["Position"] = positions
-        df_signals["Returns"] = df_signals["Close"].pct_change()
-        df_signals["Strategy"] = df_signals["Position"].shift(1) * df_signals["Returns"]
-
-        # Metrics
-        total_return = (1 + df_signals["Strategy"].dropna()).prod() - 1
-        total_trades = int(
-            df_signals["Long_Signal"].sum() + df_signals["Short_Signal"].sum()
-        )
-        equity = (1 + df_signals["Strategy"]).cumprod()
-        max_dd = (equity / equity.cummax() - 1).min()
-
+        result_df = strategy_func(df.copy())
+        long_signals = result_df["Long_Signal"].sum() if "Long_Signal" in result_df else 0
+        short_signals = result_df["Short_Signal"].sum() if "Short_Signal" in result_df else 0
+        
+        # Simple return calculation
+        signals = result_df["Long_Signal"].fillna(False) | result_df["Short_Signal"].fillna(False)
+        returns = result_df["Close"].pct_change() * signals.shift().fillna(0)
+        total_return = (1 + returns.dropna()).prod() - 1
+        
         return {
-            "name": name,
-            "return": total_return,
-            "trades": total_trades,
-            "max_dd": max_dd,
-            "win_rate": (
-                len(df_signals[df_signals["Strategy"] > 0]) / total_trades
-                if total_trades > 0
-                else 0
-            ),
-            "df": df_signals,
+            "strategy": name,
+            "long": int(long_signals),
+            "short": int(short_signals),
+            "total_signals": int(long_signals + short_signals),
+            "total_return": total_return * 100,
+            "win_rate": 0 if signals.sum() == 0 else (returns > 0).sum() / signals.sum() * 100
         }
     except Exception as e:
-        print(f"❌ {name}: {e}")
-        return None
+        console.print(f"❌ {name} failed: {e}", style="bold red")
+        return {"strategy": name, "long": 0, "short": 0, "total_signals": 0, "total_return": 0, "win_rate": 0}
 
 
-def run_all_strategy(df, show_plots=False):
-    """Run ALL strategy and compare"""
-    results = []
-
-    print("\n🔥 RUNNING ALL STRATEGIES...\n")
-    print("Strategy\t\tReturn\tTrades\tWin%\tMaxDD")
-    print("-" * 50)
-
-    for strategy_name in STRATEGY_LIST:
-        strategy_func = load_strategy(strategy_name)
+def run_all_strategies(df: pd.DataFrame, show_plots: bool = False) -> List[Dict]:
+    """Run ALL available strategies."""
+    strategy_dir = Path("./strategy")
+    strategies = []
+    
+    # Load all strategy files
+    for strategy_file in strategy_dir.glob("*.py"):
+        if strategy_file.name.startswith("_") or strategy_file.stem == "__init__":
+            continue
+            
+        strategy_func = load_strategy(strategy_file.stem)
         if strategy_func:
-            result = backtest_strategy(df, strategy_func, strategy_name)
-            if result:
-                results.append(result)
-                print(
-                    f"{strategy_name:<15}\t{result['return']:.2%}\t{result['trades']:3d}\t{result['win_rate']:.1%}\t{result['max_dd']:.2%}"
-                )
-
-                # Individual plot
-                if show_plots and len(result["df"]) > 0:
-                    plt.figure(figsize=(12, 6))
-                    plt.plot(
-                        result["df"].index,
-                        result["df"]["Close"],
-                        label="Nifty",
-                    )
-                    longs = result["df"][result["df"]["Long_Signal"]]
-                    shorts = result["df"][result["df"]["Short_Signal"]]
-                    plt.scatter(
-                        longs.index,
-                        longs["Low"],
-                        marker="^",
-                        color="green",
-                        s=50,
-                        label="Long",
-                    )
-                    plt.scatter(
-                        shorts.index,
-                        shorts["High"],
-                        marker="v",
-                        color="red",
-                        s=50,
-                        label="Short",
-                    )
-                    plt.title(f"{strategy_name} - Return: {result['return']:.2%}")
-                    plt.legend()
-                    plt.show()
-
+            strategies.append(strategy_func)
+    
+    results = []
+    console.print(f"🔬 Running {len(strategies)} strategies...", style="bold cyan")
+    
+    for strategy_func in strategies:
+        # Extract strategy name from function or use generic
+        name = getattr(strategy_func, "__name__", "Unknown").replace("run_strategy", "")
+        result = backtest_strategy(df, strategy_func, name)
+        results.append(result)
+    
     return results
 
 
-def plot_comparison(results):
-    """Dashboard comparing ALL strategy"""
+def plot_comparison(results: List[Dict]):
+    """Rich table dashboard comparing ALL strategies."""
     if not results:
+        console.print("No results to display", style="bold yellow")
         return
-
-    plt.style.use("default")
-    fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(15, 12))
-
-    # Returns comparison
-    names = [r["name"] for r in results]
-    returns = [r["return"] for r in results]
-    ax1.bar(names, returns)
-    ax1.set_title("Total Return Comparison")
-    ax1.tick_params(axis="x", rotation=45)
-
-    # Trades
-    trades = [r["trades"] for r in results]
-    ax2.bar(names, trades)
-    ax2.set_title("Total Trades")
-    ax2.tick_params(axis="x", rotation=45)
-
-    # Win Rate
-    win_rates = [r["win_rate"] for r in results]
-    ax3.bar(names, win_rates)
-    ax3.set_title("Win Rate")
-    ax3.tick_params(axis="x", rotation=45)
-
-    # Max Drawdown
-    drawdowns = [abs(r["max_dd"]) for r in results]
-    ax4.bar(names, drawdowns)
-    ax4.set_title("Max Drawdown")
-    ax4.tick_params(axis="x", rotation=45)
-
-    plt.tight_layout()
-    plt.show()
-
-    # BEST STRATEGY
-    best = max(results, key=lambda x: x["return"])
-    print(f"\n🏆 BEST: {best['name']} - {best['return']:.2%} return")
-
-
-def main():
-    args = parse_args()
-    print(f"🚀 CORE BOT: {args.days} days, {args.interval}")
-
-    df = fetch_data(args.days, args.interval)
-    results = run_all_strategy(df, args.show_plots)
-
-    if results:
-        plot_comparison(results)
-
-
-if __name__ == "__main__":
-    main()
-
-
-def fetch_data(days, interval):
-    """Fetch Nifty data with multiple symbol fallback"""
-    print("📊 Fetching data...")
-    end_date = datetime.now()
-    start_date = end_date - timedelta(days=days)
-
-    symbols = ["^NSEI", "NIFTY50.NS", "BANKNIFTY.NS"]
-    for symbol in symbols:
-        try:
-            df = yf.download(
-                symbol,
-                start=start_date,
-                end=end_date,
-                interval=interval,
-                progress=False,
-            )
-            if len(df) > 50:
-                if isinstance(df.columns, pd.MultiIndex):
-                    df.columns = [
-                        col[0] if isinstance(col, tuple) else col for col in df.columns
-                    ]
-                df = df.dropna()
-                print(f"✅ {symbol}: {len(df)} candles")
-                return df
-        except:
-            continue
-
-    print("❌ No data found!")
-    sys.exit(1)
-
-
-def backtest_strategy(df, strategy_func, name):
-    """Run single strategy backtest"""
-    try:
-        df_signals = strategy_func(df.copy())
-
-        # Position logic
-        position = 0
-        positions = [0] * len(df_signals)
-        for i in range(1, len(df_signals)):
-            if df_signals["Long_Signal"].iloc[i] and position != 1:
-                position = 1
-            elif df_signals["Short_Signal"].iloc[i] and position != -1:
-                position = -1
-            elif (df_signals["Short_Signal"].iloc[i] and position == 1) or (
-                df_signals["Long_Signal"].iloc[i] and position == -1
-            ):
-                position = 0
-            positions[i] = position
-
-        df_signals["Position"] = positions
-        df_signals["Returns"] = df_signals["Close"].pct_change()
-        df_signals["Strategy"] = df_signals["Position"].shift(1) * df_signals["Returns"]
-
-        # Metrics
-        total_return = (1 + df_signals["Strategy"].dropna()).prod() - 1
-        total_trades = int(
-            df_signals["Long_Signal"].sum() + df_signals["Short_Signal"].sum()
+    
+    table = Table(title="🏆 STRATEGY COMPARISON", show_header=True, header_style="bold magenta")
+    table.add_column("Strategy", style="cyan")
+    table.add_column("Long", justify="right")
+    table.add_column("Short", justify="right")
+    table.add_column("Total", justify="right")
+    table.add_column("Return %", justify="right")
+    table.add_column("Win %", justify="right")
+    
+    best_return = max(r["total_return"] for r in results)
+    
+    for result in sorted(results, key=lambda x: x["total_return"], reverse=True):
+        return_color = "bold green" if result["total_return"] == best_return else "white"
+        table.add_row(
+            result["strategy"][:20],
+            str(result["long"]),
+            str(result["short"]),
+            str(result["total_signals"]),
+            f"[{return_color}]{result['total_return']:.1f}%[/]",
+            f"{result['win_rate']:.0f}%"
         )
-        equity = (1 + df_signals["Strategy"]).cumprod()
-        max_dd = (equity / equity.cummax() - 1).min()
-
-        return {
-            "name": name,
-            "return": total_return,
-            "trades": total_trades,
-            "max_dd": max_dd,
-            "win_rate": (
-                len(df_signals[df_signals["Strategy"] > 0]) / total_trades
-                if total_trades > 0
-                else 0
-            ),
-            "df": df_signals,
-        }
-    except Exception as e:
-        print(f"❌ {name}: {e}")
-        return None
-
-
-def run_all_strategy(df, show_plots=False):
-    """Run ALL strategy and compare"""
-    results = []
-
-    print("\n🔥 RUNNING ALL STRATEGIES...\n")
-    print("Strategy\t\tReturn\tTrades\tWin%\tMaxDD")
-    print("-" * 50)
-
-    for strategy_name in STRATEGY_LIST:
-        strategy_func = load_strategy(strategy_name)
-        if strategy_func:
-            result = backtest_strategy(df, strategy_func, strategy_name)
-            if result:
-                results.append(result)
-                print(
-                    f"{strategy_name:<15}\t{result['return']:.2%}\t{result['trades']:3d}\t{result['win_rate']:.1%}\t{result['max_dd']:.2%}"
-                )
-
-                # Individual plot
-                if show_plots and len(result["df"]) > 0:
-                    plt.figure(figsize=(12, 6))
-                    plt.plot(
-                        result["df"].index,
-                        result["df"]["Close"],
-                        label="Nifty",
-                    )
-                    longs = result["df"][result["df"]["Long_Signal"]]
-                    shorts = result["df"][result["df"]["Short_Signal"]]
-                    plt.scatter(
-                        longs.index,
-                        longs["Low"],
-                        marker="^",
-                        color="green",
-                        s=50,
-                        label="Long",
-                    )
-                    plt.scatter(
-                        shorts.index,
-                        shorts["High"],
-                        marker="v",
-                        color="red",
-                        s=50,
-                        label="Short",
-                    )
-                    plt.title(f"{strategy_name} - Return: {result['return']:.2%}")
-                    plt.legend()
-                    plt.show()
-
-    return results
-
-
-def plot_comparison(results):
-    """Dashboard comparing ALL strategy"""
-    if not results:
-        return
-
-    plt.style.use("default")
-    fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(15, 12))
-
-    # Returns comparison
-    names = [r["name"] for r in results]
-    returns = [r["return"] for r in results]
-    ax1.bar(names, returns)
-    ax1.set_title("Total Return Comparison")
-    ax1.tick_params(axis="x", rotation=45)
-
-    # Trades
-    trades = [r["trades"] for r in results]
-    ax2.bar(names, trades)
-    ax2.set_title("Total Trades")
-    ax2.tick_params(axis="x", rotation=45)
-
-    # Win Rate
-    win_rates = [r["win_rate"] for r in results]
-    ax3.bar(names, win_rates)
-    ax3.set_title("Win Rate")
-    ax3.tick_params(axis="x", rotation=45)
-
-    # Max Drawdown
-    drawdowns = [abs(r["max_dd"]) for r in results]
-    ax4.bar(names, drawdowns)
-    ax4.set_title("Max Drawdown")
-    ax4.tick_params(axis="x", rotation=45)
-
-    plt.tight_layout()
-    plt.show()
-
-    # BEST STRATEGY
-    best = max(results, key=lambda x: x["return"])
-    print(f"\n🏆 BEST: {best['name']} - {best['return']:.2%} return")
+    
+    console.print(table)
 
 
 def main():
+    """Main execution."""
     args = parse_args()
-    print(f"🚀 CORE BOT: {args.days} days, {args.interval}")
-
-    df = fetch_data(args.days, args.interval)
-    results = run_all_strategy(df, args.show_plots)
-
-    if results:
-        plot_comparison(results)
+    
+    # Fetch data
+    df = fetch_data(args.days)
+    
+    # Run all strategies
+    results = run_all_strategies(df, args.show_plots)
+    
+    # Display comparison
+    plot_comparison(results)
+    
+    # Save results
+    results_df = pd.DataFrame(results)
+    results_df.to_csv(f"niso_backtest_{datetime.now().strftime('%Y%m%d_%H%M')}.csv", index=False)
+    console.print(f"💾 Results saved to niso_backtest_*.csv", style="bold green")
 
 
 if __name__ == "__main__":
