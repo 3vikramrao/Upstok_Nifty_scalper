@@ -8,6 +8,7 @@ import importlib.util
 import os
 import sys
 import warnings
+import datetime
 from pathlib import Path
 from typing import Callable, Dict, List, Optional, Tuple
 
@@ -173,8 +174,9 @@ def main():
     # Save results
     results_df = pd.DataFrame(results)
     results_df.to_csv(f"niso_backtest_{datetime.now().strftime('%Y%m%d_%H%M')}.csv", index=False)
-    console.print(f"💾 Results saved to niso_backtest_*.csv", style="bold green")
+    console.print("💾 Results saved to niso_backtest_*.csv", style="bold green")
 
 
 if __name__ == "__main__":
     main()
+
