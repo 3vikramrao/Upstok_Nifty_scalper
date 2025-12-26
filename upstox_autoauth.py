@@ -90,13 +90,13 @@ def get_auth_code() -> str:
         # 1) Enter mobile/email
         try:
             user_field = wait.until(
-                EC.presence_of_element_located((By.ID, "mobileNum")),
+                EC.presence_of_element_located((By.ID, "mobileNum"))
             )
         except TimeoutException:
             user_field = wait.until(
                 EC.presence_of_element_located(
-                    (By.XPATH, "//input[@type='text' or @inputmode='numeric']"),
-                ),
+                    (By.XPATH, "//input[@type='text' or @inputmode='numeric']")
+                )
             )
 
         user_field.clear()
@@ -113,8 +113,8 @@ def get_auth_code() -> str:
                         "or contains(.,'Get OTP') "
                         "or @id='getOtp']"
                     ),
-                ),
-            ),
+                )
+            )
         )
         cont_btn.click()
         print("Clicked Continue / Get OTP")
@@ -123,14 +123,14 @@ def get_auth_code() -> str:
         totp = pyotp.TOTP(TOTP_SECRET).now()
         time.sleep(2)
         otp_field = wait.until(
-            EC.presence_of_element_located((By.ID, "otpNum")),
+            EC.presence_of_element_located((By.ID, "otpNum"))
         )
         otp_field.clear()
         otp_field.send_keys(totp)
         print("TOTP entered")
 
         cont_otp_btn = wait.until(
-            EC.element_to_be_clickable((By.ID, "continueBtn")),
+            EC.element_to_be_clickable((By.ID, "continueBtn"))
         )
         cont_otp_btn.click()
         print("Clicked Continue after OTP")
@@ -138,21 +138,21 @@ def get_auth_code() -> str:
         # 4) Enter PIN
         time.sleep(2)
         pin_field = wait.until(
-            EC.presence_of_element_located((By.ID, "pinCode")),
+            EC.presence_of_element_located((By.ID, "pinCode"))
         )
         pin_field.clear()
         pin_field.send_keys(PIN_CODE)
         print("PIN entered")
 
         pin_continue_btn = wait.until(
-            EC.element_to_be_clickable((By.ID, "pinContinueBtn")),
+            EC.element_to_be_clickable((By.ID, "pinContinueBtn"))
         )
         pin_continue_btn.click()
         print("Clicked Continue after PIN")
 
         # 5) Wait for redirect with ?code=
         WebDriverWait(browser, 180).until(
-            lambda d: "code=" in d.current_url,
+            lambda d: "code=" in d.current_url
         )
         codelink = browser.current_url
         print("Redirect URL:", codelink)
@@ -162,7 +162,7 @@ def get_auth_code() -> str:
 
         if "code" not in query:
             raise RuntimeError(
-                "Authorization code not found in redirect URL",
+                "Authorization code not found in redirect URL"
             )
 
         code = query["code"][0]
@@ -206,7 +206,7 @@ def exchange_code_for_access_token(auth_code: str) -> str:
     access_token = tokens.get("access_token")
     if not access_token:
         raise RuntimeError(
-            "No access_token in response; check the JSON above for details.",
+            "No access_token in response; check the JSON above for details."
         )
     return access_token
 
@@ -226,7 +226,7 @@ def main() -> None:
     print("=" * 55)
     print(
         "Upstox access tokens expire daily; "
-        "rerun this script when needed.",
+        "rerun this script when needed."
     )
     print("=" * 55)
 
