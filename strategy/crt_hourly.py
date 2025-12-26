@@ -14,35 +14,41 @@ class Strategy:
         if len(df) < 30:
             return 0
 
-        df['time'] = pd.to_datetime(df['time'])
-        df_h = df.set_index('time').resample('1H').agg({
-            'open': 'first',
-            'high': 'max',
-            'low': 'min',
-            'close': 'last',
-            'volume': 'sum'
-        }).dropna().reset_index()
+        df["time"] = pd.to_datetime(df["time"])
+        df_h = (
+            df.set_index("time")
+            .resample("1H")
+            .agg(
+                {
+                    "open": "first",
+                    "high": "max",
+                    "low": "min",
+                    "close": "last",
+                    "volume": "sum",
+                }
+            )
+            .dropna()
+            .reset_index()
+        )
 
         if len(df_h) < 3:
             return 0
 
-        df_h['ir'] = (
-            (df_h['high'] < df_h['high'].shift(1)) &
-            (df_h['low'] > df_h['low'].shift(1))
+        df_h["ir"] = (df_h["high"] < df_h["high"].shift(1)) & (
+            df_h["low"] > df_h["low"].shift(1)
         )
-        df_h['or'] = (
-            (df_h['high'] > df_h['high'].shift(1)) &
-            (df_h['low'] < df_h['low'].shift(1))
+        df_h["or"] = (df_h["high"] > df_h["high"].shift(1)) & (
+            df_h["low"] < df_h["low"].shift(1)
         )
-        df_h['ir_streak'] = df_h['ir'].rolling(3).sum()
+        df_h["ir_streak"] = df_h["ir"].rolling(3).sum()
 
-        ir_streak = df_h['ir_streak'].iloc[-1]
-        current_or = df_h['or'].iloc[-1]
+        ir_streak = df_h["ir_streak"].iloc[-1]
+        current_or = df_h["or"].iloc[-1]
 
         if ir_streak >= self.ir_streak_min and current_or:
-            if df_h['close'].iloc[-1] > df_h['high'].shift(1).iloc[-1]:
+            if df_h["close"].iloc[-1] > df_h["high"].shift(1).iloc[-1]:
                 return 1
-            elif df_h['close'].iloc[-1] < df_h['low'].shift(1).iloc[-1]:
+            elif df_h["close"].iloc[-1] < df_h["low"].shift(1).iloc[-1]:
                 return -1
 
         return 0
@@ -54,30 +60,31 @@ def run_strategy(nifty):
 
     if isinstance(nifty.columns, pd.MultiIndex):
         nifty.columns = [
-            col[0] if isinstance(col, tuple) else col
-            for col in nifty.columns
+            col[0] if isinstance(col, tuple) else col for col in nifty.columns
         ]
 
-    df_crt = nifty.rename(columns={
-        'Open': 'open',
-        'High': 'high',
-        'Low': 'low',
-        'Close': 'close',
-        'Volume': 'volume'
-    }).copy()
+    df_crt = nifty.rename(
+        columns={
+            "Open": "open",
+            "High": "high",
+            "Low": "low",
+            "Close": "close",
+            "Volume": "volume",
+        }
+    ).copy()
 
-    df_crt['time'] = pd.to_datetime(df_crt.index)
+    df_crt["time"] = pd.to_datetime(df_crt.index)
 
     crt = Strategy(ir_streak_min=2)
     signals = []
     for i in range(30, len(df_crt)):
-        signal = crt.detect_signal(df_crt.iloc[:i+1])
+        signal = crt.detect_signal(df_crt.iloc[: i + 1])
         signals.append(signal)
 
-    signals = [0] * 30 + signals[:len(df_crt)-30]
+    signals = [0] * 30 + signals[: len(df_crt) - 30]
 
-    nifty['Long_Signal'] = [s == 1 for s in signals]
-    nifty['Short_Signal'] = [s == -1 for s in signals]
+    nifty["Long_Signal"] = [s == 1 for s in signals]
+    nifty["Short_Signal"] = [s == -1 for s in signals]
 
     print(
         f"✅ CRT: {sum(nifty['Long_Signal'])} Long, "

@@ -4,17 +4,16 @@ NISO – NIFTY Options Volume Profile Scalper with Paper Logging
 Replaces Supertrend with Volume Profile POC/VAH/VAL signals.
 """
 
-import os
-import time
 import csv
-import requests
-import pandas as pd
-import numpy as np
-from pathlib import Path
-from datetime import datetime, timedelta  # noqa: F401
 import datetime as dt
+import os
 import re  # noqa: F401
+from datetime import datetime, timedelta  # noqa: F401
+from pathlib import Path
 
+import numpy as np
+import pandas as pd
+import requests
 
 # ======================================================================
 # CONFIG & CREDENTIALS
@@ -305,4 +304,5 @@ def calculate_volume_profile(df, rows=VP_ROWS):
 
 def detect_vp_signal(df):
     """Detect VP signals: 1=CALL, -1=PUT, 0=no signal."""
-    if df.empty or len(df) < 30
+    if df.empty or len(df) < 30:
+        return 0

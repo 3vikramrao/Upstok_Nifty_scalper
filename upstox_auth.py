@@ -13,7 +13,6 @@ from env import (  # type: ignore
     UPSTOX_REDIRECT_URI,
 )
 
-
 # ---------- CONFIG LOADING ----------
 
 CLIENT_ID = UPSTOX_CLIENT_KEY
@@ -58,7 +57,9 @@ while True:
             auth_code = None
     if auth_code:
         break
-    print("URL does not contain a valid code= parameter - please copy again.\n")
+    print(
+        "URL does not contain a valid code= parameter - please copy again.\n"
+    )
 
 print(f"Using auth code: {auth_code}")
 

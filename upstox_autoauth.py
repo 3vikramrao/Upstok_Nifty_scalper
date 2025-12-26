@@ -38,7 +38,6 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
 from webdriver_manager.chrome import ChromeDriverManager
 
-
 # ---------- BASIC VALIDATION ----------
 
 CLIENT_ID = UPSTOX_CLIENT_KEY
@@ -60,6 +59,7 @@ if not USERNAME or not TOTP_SECRET or not PIN_CODE:
 
 
 # ---------- STEP 1: SELENIUM LOGIN TO GET CODE ----------
+
 
 def get_auth_code() -> str:
     browser = None
@@ -151,9 +151,7 @@ def get_auth_code() -> str:
         print("Clicked Continue after PIN")
 
         # 5) Wait for redirect with ?code=
-        WebDriverWait(browser, 180).until(
-            lambda d: "code=" in d.current_url
-        )
+        WebDriverWait(browser, 180).until(lambda d: "code=" in d.current_url)
         codelink = browser.current_url
         print("Redirect URL:", codelink)
 
@@ -161,15 +159,17 @@ def get_auth_code() -> str:
         query = urllib.parse.parse_qs(parsed.query)
 
         if "code" not in query:
-            raise RuntimeError(
-                "Authorization code not found in redirect URL"
-            )
+            raise RuntimeError("Authorization code not found in redirect URL")
 
         code = query["code"][0]
         print("Authorization Code:", code)
         return code
 
-    except (TimeoutException, NoSuchElementException, WebDriverException) as exc:
+    except (
+        TimeoutException,
+        NoSuchElementException,
+        WebDriverException,
+    ) as exc:
         print("❌ Selenium error while logging in:", repr(exc))
         raise
     finally:
@@ -181,6 +181,7 @@ def get_auth_code() -> str:
 
 
 # ---------- STEP 2: EXCHANGE CODE FOR ACCESS TOKEN ----------
+
 
 def exchange_code_for_access_token(auth_code: str) -> str:
     token_url = "https://api.upstox.com/v2/login/authorization/token"
@@ -213,6 +214,7 @@ def exchange_code_for_access_token(auth_code: str) -> str:
 
 # ---------- STEP 3: MAIN ----------
 
+
 def main() -> None:
     print("Starting auto Upstox auth (v2)...")
     auth_code = get_auth_code()
@@ -225,8 +227,7 @@ def main() -> None:
     print(f"Access token saved to {out_file}.")
     print("=" * 55)
     print(
-        "Upstox access tokens expire daily; "
-        "rerun this script when needed."
+        "Upstox access tokens expire daily; " "rerun this script when needed."
     )
     print("=" * 55)
 

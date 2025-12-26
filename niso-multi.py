@@ -3,15 +3,15 @@
 NISO – NIFTY Options Scalper v2 with EMA 9/15 + RSI 9 + SuperTrend + Parabolic SAR + VWAP
 """
 
+import csv
 import os
 import time
-import csv
-import requests
-import pandas as pd
-import numpy as np
-from pathlib import Path
 from datetime import datetime, timedelta
-import re
+from pathlib import Path
+
+import numpy as np
+import pandas as pd
+import requests
 import talib  # Add this: pip install TA-Lib
 
 # ======================================================================
@@ -155,8 +155,12 @@ def detect_multi_trend(df):
     signals = []
 
     # 1. EMA 9/15 crossover
-    ema_bull = latest["ema9"] > latest["ema15"] and prev["ema9"] <= prev["ema15"]
-    ema_bear = latest["ema9"] < latest["ema15"] and prev["ema9"] >= prev["ema15"]
+    ema_bull = (
+        latest["ema9"] > latest["ema15"] and prev["ema9"] <= prev["ema15"]
+    )
+    ema_bear = (
+        latest["ema9"] < latest["ema15"] and prev["ema9"] >= prev["ema15"]
+    )
     if ema_bull:
         signals.append(1)
     elif ema_bear:
@@ -171,15 +175,27 @@ def detect_multi_trend(df):
         signals.append(-1)
 
     # 3. SuperTrend
-    if latest["close"] > latest["supertrend"] and prev["close"] <= prev["supertrend"]:
+    if (
+        latest["close"] > latest["supertrend"]
+        and prev["close"] <= prev["supertrend"]
+    ):
         signals.append(1)
-    elif latest["close"] < latest["supertrend"] and prev["close"] >= prev["supertrend"]:
+    elif (
+        latest["close"] < latest["supertrend"]
+        and prev["close"] >= prev["supertrend"]
+    ):
         signals.append(-1)
 
     # 4. Parabolic SAR
-    if latest["close"] > latest["parabolic_sar"] and prev["close"] <= prev["parabolic_sar"]:
+    if (
+        latest["close"] > latest["parabolic_sar"]
+        and prev["close"] <= prev["parabolic_sar"]
+    ):
         signals.append(1)
-    elif latest["close"] < latest["parabolic_sar"] and prev["close"] >= prev["parabolic_sar"]:
+    elif (
+        latest["close"] < latest["parabolic_sar"]
+        and prev["close"] >= prev["parabolic_sar"]
+    ):
         signals.append(-1)
 
     # 5. VWAP
@@ -528,7 +544,9 @@ def place_hft_limit_order(instrument_token, quantity, side, price):
     if PAPER:
         print("[PAPER] LIMIT:", payload)
         return f"PAPER-LMT-{side}-{int(time.time())}"
-    r = requests.post(f"{BASE_HFT}/order/place", headers=hft_headers(), json=payload)
+    r = requests.post(
+        f"{BASE_HFT}/order/place", headers=hft_headers(), json=payload
+    )
     print("LIMIT status:", r.status_code, r.text[:200])
     r.raise_for_status()
     return r.json()["data"]["order_id"]
@@ -552,7 +570,9 @@ def place_hft_sl_order(instrument_token, quantity, side, price, trigger_price):
     if PAPER:
         print("[PAPER] SL:", payload)
         return f"PAPER-SL-{side}-{int(time.time())}"
-    r = requests.post(f"{BASE_HFT}/order/place", headers=hft_headers(), json=payload)
+    r = requests.post(
+        f"{BASE_HFT}/order/place", headers=hft_headers(), json=payload
+    )
     print("SL status:", r.status_code, r.text[:200])
     r.raise_for_status()
     return r.json()["data"]["order_id"]

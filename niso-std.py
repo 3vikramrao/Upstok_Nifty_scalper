@@ -4,15 +4,9 @@ NISO – NIFTY Options Supertrend Scalper with Paper Logging.
 """
 
 import os
-import time
-import csv
-import requests
-import pandas as pd
-from pathlib import Path
-from datetime import datetime, timedelta  # noqa: F401
-import datetime as dt
 import re  # noqa: F401
-
+from datetime import datetime, timedelta  # noqa: F401
+from pathlib import Path
 
 # ======================================================================
 # CONFIG & CREDENTIALS
@@ -20,7 +14,6 @@ import re  # noqa: F401
 from env import (
     UPSTOX_CLIENT_KEY,
     UPSTOX_CLIENT_SECRET,
-    UPSTOX_REDIRECT_URI,
 )
 
 PAPER = True
@@ -57,5 +50,5 @@ def get_access_token():
         raise RuntimeError(
             "Run Upstox auth script to create upstox_access_token.txt"
         )
-    with open(ACCESS_TOKEN_FILE, "r", encoding="utf-8") as f:
+    with open(ACCESS_TOKEN_FILE, "r", encoding="utf-8"):
         token

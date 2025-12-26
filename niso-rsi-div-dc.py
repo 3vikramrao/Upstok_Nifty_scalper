@@ -9,17 +9,15 @@ Requirements:
   YYYY-MM-DD-rsi-div-dc-trades.csv
 """
 
-import os
-import time
 import csv
-import requests
-import pandas as pd
-import numpy as np
-from pathlib import Path
-from datetime import datetime, timedelta  # noqa: F401
 import datetime as dt
+import os
 import re  # noqa: F401
+from datetime import datetime, timedelta  # noqa: F401
+from pathlib import Path
 
+import pandas as pd
+import requests
 
 # ======================================================================
 # CONFIG & CREDENTIALS
@@ -109,7 +107,9 @@ def ensure_log_files():
     PAPER_LOG_DIR.mkdir(parents=True, exist_ok=True)
 
     lifetime_file = PAPER_LOG_DIR / "lifetime-rsi-div-dc_log.csv"
-    today_file = PAPER_LOG_DIR / f"{datetime.now().date()}_rsi-div-dc-trades.csv"
+    today_file = (
+        PAPER_LOG_DIR / f"{datetime.now().date()}_rsi-div-dc-trades.csv"
+    )
 
     header = [
         "timestamp",
@@ -213,14 +213,16 @@ def get_nifty_intraday_candles(minutes_back: int):
     data = r.json()
     rows = []
     for c in data["data"]["candles"]:
-        rows.append(dict(
-            time=dt.datetime.fromisoformat(c[0].replace("Z", "+00:00")),
-            open=c[1],
-            high=c[2],
-            low=c[3],
-            close=c[4],
-            volume=c[5],
-        ))
+        rows.append(
+            dict(
+                time=dt.datetime.fromisoformat(c[0].replace("Z", "+00:00")),
+                open=c[1],
+                high=c[2],
+                low=c[3],
+                close=c[4],
+                volume=c[5],
+            )
+        )
     return pd.DataFrame(rows)
 
 
@@ -229,4 +231,3 @@ def get_nifty_option_contracts(expiry_date=None, verbose=True):
     params = {"instrument_key": "NSE_INDEX|Nifty 50"}
     if expiry_date:
         params["expiry_date"] = expiry_date
-    url = f"{BASE_REST}/option/contract

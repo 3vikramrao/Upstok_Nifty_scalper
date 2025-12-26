@@ -3,14 +3,15 @@
 NISO – NIFTY Options Scalper v1 with Paper Logging
 """
 
+import csv
+import datetime as dt
 import os
 import time
-import csv
-import requests
-import pandas as pd
+from datetime import datetime
 from pathlib import Path
-from datetime import datetime, timedelta
-import datetime as dt
+
+import pandas as pd
+import requests
 
 # ======================================================================
 # CONFIG & CREDENTIALS
@@ -377,7 +378,7 @@ def place_hft_market_order(instrument_token, quantity, side):
 
 def place_hft_limit_order(instrument_token, quantity, side, price):
     """Place HFT limit order."""
-    payload = {
+    {
         "quantity": quantity,
         "product": PRODUCT,
         "validity": "DAY",
@@ -388,4 +389,5 @@ def place_hft_limit_order(instrument_token, quantity, side, price):
         "transaction_type": side.upper(),
         "disclosed_quantity": 0,
         "trigger_price": 0,
-        "is_amo": False
+        "is_amo": False,
+    }

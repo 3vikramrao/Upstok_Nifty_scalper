@@ -1,6 +1,8 @@
-import os, json, time, requests, pandas as pd
+import os
 from datetime import datetime, timedelta
 
+import pandas as pd
+import requests
 from env import (
     UPSTOX_API_KEY,
     UPSTOX_API_SECRET,
@@ -14,8 +16,8 @@ class BrokerClient:
     """
 
     def __init__(self, access_token_path="upstox_access_token.txt"):
-        self.api_key  = UPSTOX_API_KEY
-        self.secret   = UPSTOX_API_SECRET
+        self.api_key = UPSTOX_API_KEY
+        self.secret = UPSTOX_API_SECRET
         self.redirect = UPSTOX_REDIRECT_URI
 
         if not self.api_key or not self.secret or not self.redirect:
@@ -27,7 +29,9 @@ class BrokerClient:
             raise RuntimeError(
                 f"{access_token_path} not found. Run upstox_auth.py to generate access token."
             )
-        self.access_tok = open(access_token_path, "r", encoding="utf-8").read().strip()
+        self.access_tok = (
+            open(access_token_path, "r", encoding="utf-8").read().strip()
+        )
 
     # ---------- headers ---------------------------------------------------
     def _headers(self):
@@ -87,10 +91,14 @@ class BrokerClient:
 
     # ---------- order helpers (REAL, if you go live) ----------------------
     def place_order(self, *args, **kwargs):
-        raise NotImplementedError("Real order placement not used in PAPER mode via BrokerClient.")
+        raise NotImplementedError(
+            "Real order placement not used in PAPER mode via BrokerClient."
+        )
 
     def positions(self):
-        raise NotImplementedError("Positions not needed in PAPER mode via BrokerClient.")
+        raise NotImplementedError(
+            "Positions not needed in PAPER mode via BrokerClient."
+        )
 
     # ---------- option symbol helper --------------------------------------
     def get_option_symbol(self, underlying, expiry, strike, right):
@@ -119,7 +127,9 @@ class PaperBroker:
     def place_order(self, instrument_token, quantity, side):
         side = side.upper()
         oid = self._next_oid()
-        print(f"[PAPER] Placing {side} {quantity} of {instrument_token}, oid={oid}")
+        print(
+            f"[PAPER] Placing {side} {quantity} of {instrument_token}, oid={oid}"
+        )
         self.orderbook[oid] = {
             "symbol": instrument_token,
             "qty": quantity,

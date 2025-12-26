@@ -7,19 +7,18 @@
 NISO – NIFTY Options Supertrend Scalper with Paper Logging (Notebook version)
 """
 
+import csv
+import datetime as dt
+import importlib
 import os
 import time
-import csv
-import requests
-import pandas as pd
+from datetime import datetime
 from pathlib import Path
-from datetime import datetime, timedelta
-import datetime as dt
-import re
-import importlib
+
+import pandas as pd
+import requests
 import yaml
-
-
+from env import UPSTOX_CLIENT_KEY, UPSTOX_CLIENT_SECRET, UPSTOX_REDIRECT_URI
 
 # %% [markdown]
 # Cell 2 – Env variables and global constants
@@ -27,7 +26,6 @@ import yaml
 # %%
 # CONFIG & CREDENTIALS
 
-from env import UPSTOX_CLIENT_KEY, UPSTOX_CLIENT_SECRET, UPSTOX_REDIRECT_URI
 
 PAPER = True  # False = LIVE, True = paper-trade with logging
 
@@ -36,7 +34,9 @@ CLIENT_SECRET = UPSTOX_CLIENT_SECRET
 REDIRECT_URI = UPSTOX_REDIRECT_URI
 
 if not CLIENT_ID or not CLIENT_SECRET or not REDIRECT_URI:
-    raise RuntimeError("Set UPSTOX_CLIENT_KEY, UPSTOX_CLIENT_SECRET, UPSTOX_REDIRECT_URI in env.py")
+    raise RuntimeError(
+        "Set UPSTOX_CLIENT_KEY, UPSTOX_CLIENT_SECRET, UPSTOX_REDIRECT_URI in env.py"
+    )
 
 ACCESS_TOKEN_FILE = "upstox_access_token.txt"
 
@@ -44,12 +44,12 @@ BASE_REST = "https://api.upstox.com/v2"
 BASE_HFT = "https://api-hft.upstox.com/v2"
 
 QTY = 150
-PRODUCT = "I"      # Intraday
+PRODUCT = "I"  # Intraday
 TAG = "niso-supertrend-bot"
 
 # SL/TGT parameters
-SL_PCT = 0.20         # 20% stop loss
-TG_PCT = 0.30         # 30% target
+SL_PCT = 0.20  # 20% stop loss
+TG_PCT = 0.30  # 30% target
 TRAIL_ATR_MULT = 1.5  # trailing SL ATR multiple
 
 # Paper log config
@@ -60,14 +60,16 @@ NIFTY_SPOT_INSTRUMENT = "NSE_INDEX|Nifty 50"
 UPSTOX_API_VERSION = "2.0"
 
 
-
 # %% [markdown]
 # Cell 3 – Auth helpers and headers
+
 
 # %%
 def get_access_token():
     if not os.path.exists(ACCESS_TOKEN_FILE):
-        raise RuntimeError("Run your Upstox auth script once to create upstox_access_token.txt")
+        raise RuntimeError(
+            "Run your Upstox auth script once to create upstox_access_token.txt"
+        )
     with open(ACCESS_TOKEN_FILE, "r", encoding="utf-8") as f:
         token = f.read().strip()
     if not token:
@@ -104,9 +106,9 @@ def now_iso():
     return datetime.now().isoformat(timespec="seconds")
 
 
-
 # %% [markdown]
 # Cell 4 – Logging helpers (CSV + strike / P&L)
+
 
 # %%
 def ensure_log_files():
@@ -121,7 +123,7 @@ def ensure_log_files():
         "side",
         "symbol",
         "instrument_key",
-        "strike",        # e.g. '26200.0 CE 2025-12-23'
+        "strike",  # e.g. '26200.0 CE 2025-12-23'
         "qty",
         "entry_price",
         "sl_price",
@@ -169,7 +171,7 @@ def instrument_info_from_key(instrument_key: str, contracts=None):
         if c.get("instrument_key") == instrument_key:
             return {
                 "strike": c.get("strike_price"),
-                "type": c.get("instrument_type"),   # CE or PE
+                "type": c.get("instrument_type"),  # CE or PE
                 "expiry": c.get("expiry"),
                 "trading_symbol": c.get("trading_symbol"),
             }
@@ -209,6 +211,7 @@ def log_trade_row(row):
 
 # %% [markdown]
 # Cell 5 – Market data: NIFTY LTP and candles
+
 
 # %%
 def get_nifty_ltp():
@@ -264,6 +267,7 @@ def get_nifty_intraday_candles(minutes_back: int):
 # %% [markdown]
 # Cell 6 – Option contracts utilities and trend logic
 
+
 # %%
 def build_strike_maps(contracts):
     df = pd.DataFrame(contracts)
@@ -284,32 +288,36 @@ def pick_near_atm_strikes(spot, strike_list, n=5):
         return []
     sorted_strikes = sorted(strike_list, key=lambda k: abs(k - spot))
     return sorted_strikes[:n]
+
+
 # Cell 6 – STRATEGY LOADER (NEW)
 def load_strategy(strategy_name, config_file="config.yaml"):
     """Dynamic strategy loader."""
     with open(config_file) as f:
         config = yaml.safe_load(f)
-    
-    strat_config = config.get('strategy', {})
+
+    strat_config = config.get("strategy", {})
     if strategy_name not in strat_config:
         raise ValueError(f"Strategy {strategy_name} not configured")
-    
-    module_name = strat_config[strategy_name]['module']
-    params = strat_config[strategy_name]['params']
-    
+
+    module_name = strat_config[strategy_name]["module"]
+    params = strat_config[strategy_name]["params"]
+
     spec = importlib.util.find_spec(f"strategy.{module_name}")
     if not spec:
         raise ImportError(f"Strategy module strategy.{module_name} not found")
-    
+
     module = importlib.import_module(f"strategy.{module_name}")
     strategy = module.StrategyClass(**params)
-    
+
     print(f"Loaded {strategy_name}: {strategy}")
     return strategy
+
 
 def detect_signal_with_strategy(df, strategy):
     """Unified signal detection."""
     return strategy.detect_signal(df)
+
 
 def pick_instrument_for_trend(trend, spot, ce_map, pe_map):
     """Pick one ATM CE or PE instrument_key based on Supertrend direction."""
@@ -321,13 +329,12 @@ def pick_instrument_for_trend(trend, spot, ce_map, pe_map):
             return None, None, None
         strike = strikes[0]
         return ce_map[strike], "CE", strike
-    else:          # bearish -> PE
+    else:  # bearish -> PE
         strikes = pick_near_atm_strikes(spot, list(pe_map.keys()), n=5)
         if not strikes:
             return None, None, None
         strike = strikes[0]
         return pe_map[strike], "PE", strike
-
 
 
 def info_from_instrument_key(contracts, instrument_key: str):
@@ -347,6 +354,7 @@ def info_from_instrument_key(contracts, instrument_key: str):
 
 # %% [markdown]
 # Cell 7 – Option LTP and order placement helpers
+
 
 # %%
 def get_option_ltp(instrument_key):
@@ -402,7 +410,9 @@ def place_hft_limit_order(instrument_token, quantity, side, price):
     if PAPER:
         print("[PAPER] LIMIT:", payload)
         return f"PAPER-LMT-{side}-{int(time.time())}"
-    r = requests.post(f"{BASE_HFT}/order/place", headers=hft_headers(), json=payload)
+    r = requests.post(
+        f"{BASE_HFT}/order/place", headers=hft_headers(), json=payload
+    )
     print("LIMIT status:", r.status_code, r.text[:200])
     r.raise_for_status()
     return r.json()["data"]["order_id"]
@@ -425,7 +435,9 @@ def place_hft_sl_order(instrument_token, quantity, side, price, trigger_price):
     if PAPER:
         print("[PAPER] SL:", payload)
         return f"PAPER-SL-{side}-{int(time.time())}"
-    r = requests.post(f"{BASE_HFT}/order/place", headers=hft_headers(), json=payload)
+    r = requests.post(
+        f"{BASE_HFT}/order/place", headers=hft_headers(), json=payload
+    )
     print("SL status:", r.status_code, r.text[:200])
     r.raise_for_status()
     return r.json()["data"]["order_id"]
@@ -437,6 +449,7 @@ def place_hft_sl_order(instrument_token, quantity, side, price, trigger_price):
 # %%
 open_positions = {}
 daily_pnl = 0.0
+
 
 class Position:
     def __init__(self, entry_oid, instrument_key, qty, entry_price):
@@ -451,16 +464,15 @@ class Position:
 
         # Place SL + TGT
         self.sl_oid = place_hft_sl_order(
-            instrument_key, qty, "SELL",
-            self.sl_price,
-            self.sl_price * 1.02
+            instrument_key, qty, "SELL", self.sl_price, self.sl_price * 1.02
         )
         self.tgt_oid = place_hft_limit_order(
-            instrument_key, qty, "SELL",
-            self.tgt_price
+            instrument_key, qty, "SELL", self.tgt_price
         )
 
-        print(f"Position: entry={entry_price:.2f}, SL={self.sl_price:.2f}, TGT={self.tgt_price:.2f}")
+        print(
+            f"Position: entry={entry_price:.2f}, SL={self.sl_price:.2f}, TGT={self.tgt_price:.2f}"
+        )
 
         # Log entry
         row = [
@@ -473,7 +485,7 @@ class Position:
             round(self.sl_price, 2),
             round(self.tgt_price, 2),
             "ENTRY",
-            0.0,   # pnl
+            0.0,  # pnl
         ]
         log_trade_row(row)
 
@@ -538,7 +550,11 @@ def monitor_positions():
 
 def dashboard():
     os.system("cls" if os.name == "nt" else "clear")
-    print("==========  NIFTY SUPER-TREND SCALPER  –", "PAPER" if PAPER else "LIVE", "MODE  ==========")
+    print(
+        "==========  NIFTY SUPER-TREND SCALPER  –",
+        "PAPER" if PAPER else "LIVE",
+        "MODE  ==========",
+    )
     print("Time   :", dt.datetime.now().strftime("%H:%M:%S"))
     print("Open   :", len(open_positions))
 
@@ -577,6 +593,7 @@ def dashboard():
 # %% [markdown]
 # Cell 9 – Single trade run helper
 
+
 # %%
 # Modified run_once()
 def run_once():
@@ -588,11 +605,12 @@ def run_once():
     if df.empty:
         print("No candle data.")
         return
-    
+
     # DIRECT CRT IMPORT - NO YAML
     from strategy.crt_hourly import Strategy
+
     strategy = Strategy(ir_streak_min=2)
-    
+
     signal = strategy.detect_signal(df)
     if signal == 0:
         print("No CRT signal.")
@@ -603,7 +621,9 @@ def run_once():
     print("Using expiry:", expiry)
 
     # Use existing pick_instrument_for_trend (signal=1→CE, -1→PE)
-    inst_key, opt_type, strike = pick_instrument_for_trend(signal, spot, ce_map, pe_map)
+    inst_key, opt_type, strike = pick_instrument_for_trend(
+        signal, spot, ce_map, pe_map
+    )
     if not inst_key:
         print("No option instrument selected.")
         return
@@ -620,10 +640,9 @@ def run_once():
     print("CRT Trade placed with SL/TGT and logged.")
 
 
-
-
 # %% [markdown]
 # Cell 10 – Auto loop (main loop you run in the notebook)
+
 
 # %%
 def auto_loop(
@@ -658,10 +677,14 @@ def auto_loop(
         if (now > end_time and not open_positions) or (
             trades_done >= max_trades_per_day and not open_positions
         ):
-            print("Stopping auto loop: time window over or max trades done, and no open positions.")
+            print(
+                "Stopping auto loop: time window over or max trades done, and no open positions."
+            )
             break
 
         time.sleep(monitor_interval_sec)
+
+
 # ======================================================================
 # MAIN
 # ======================================================================
@@ -679,6 +702,3 @@ if __name__ == "__main__":
         )
     except KeyboardInterrupt:
         print("\nCORE_BOT stopped by user.")
-
-
-

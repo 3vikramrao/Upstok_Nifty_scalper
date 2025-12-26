@@ -11,15 +11,15 @@ Requirements:
     - YYYY-MM-DD-ema_trades.csv
 """
 
+import csv
+import datetime as dt
 import os
 import time
-import csv
-import requests
-import pandas as pd
+from datetime import datetime
 from pathlib import Path
-from datetime import datetime, timedelta
-import datetime as dt
-import re
+
+import pandas as pd
+import requests
 
 # ======================================================================
 # CONFIG & CREDENTIALS
@@ -33,7 +33,9 @@ CLIENT_SECRET = UPSTOX_CLIENT_SECRET
 REDIRECT_URI = UPSTOX_REDIRECT_URI
 
 if not CLIENT_ID or not CLIENT_SECRET or not REDIRECT_URI:
-    raise RuntimeError("Set UPSTOX_CLIENT_KEY, UPSTOX_CLIENT_SECRET, UPSTOX_REDIRECT_URI in env.py")
+    raise RuntimeError(
+        "Set UPSTOX_CLIENT_KEY, UPSTOX_CLIENT_SECRET, UPSTOX_REDIRECT_URI in env.py"
+    )
 
 ACCESS_TOKEN_FILE = "upstox_access_token.txt"
 
@@ -41,12 +43,12 @@ BASE_REST = "https://api.upstox.com/v2"
 BASE_HFT = "https://api-hft.upstox.com/v2"
 
 QTY = 150
-PRODUCT = "I"      # Intraday
+PRODUCT = "I"  # Intraday
 TAG = "niso-ema-bot"
 
 # SL/TGT parameters
-SL_PCT = 0.20         # 20% stop loss
-TG_PCT = 0.30         # 30% target
+SL_PCT = 0.20  # 20% stop loss
+TG_PCT = 0.30  # 30% target
 TRAIL_ATR_MULT = 1.5  # trailing SL ATR multiple
 
 # Paper log config
@@ -56,6 +58,7 @@ PAPER_LOG_DIR = Path("paper_logs")
 NIFTY_SPOT_INSTRUMENT = "NSE_INDEX|Nifty 50"
 UPSTOX_API_VERSION = "2.0"
 
+
 def upstox_headers():
     return {
         "Authorization": f"Bearer {get_access_token()}",
@@ -63,6 +66,7 @@ def upstox_headers():
         "accept": "application/json",
         "Content-Type": "application/json",
     }
+
 
 # ======================================================================
 # LOGGING HELPERS
@@ -79,7 +83,7 @@ def ensure_log_files():
         "side",
         "symbol",
         "instrument_key",
-        "strike",        # e.g. '26200 CE'
+        "strike",  # e.g. '26200 CE'
         "qty",
         "entry_price",
         "sl_price",
@@ -112,11 +116,12 @@ def instrument_info_from_key(instrument_key: str, contracts=None):
         if c.get("instrument_key") == instrument_key:
             return {
                 "strike": c.get("strike_price"),
-                "type": c.get("instrument_type"),   # CE or PE
+                "type": c.get("instrument_type"),  # CE or PE
                 "expiry": c.get("expiry"),
                 "trading_symbol": c.get("trading_symbol"),
             }
     return None
+
 
 def log_trade_row(row):
     """
@@ -149,17 +154,19 @@ def log_trade_row(row):
             writer.writerow(log_row)
 
 
-
 def now_iso():
     """Current timestamp in ISO 8601 with seconds."""
     return datetime.now().isoformat(timespec="seconds")
+
 
 # ======================================================================
 # AUTH & HEADERS
 # ======================================================================
 def get_access_token():
     if not os.path.exists(ACCESS_TOKEN_FILE):
-        raise RuntimeError("Run your Upstox auth script once to create upstox_access_token.txt")
+        raise RuntimeError(
+            "Run your Upstox auth script once to create upstox_access_token.txt"
+        )
     with open(ACCESS_TOKEN_FILE, "r", encoding="utf-8") as f:
         token = f.read().strip()
     if not token:
@@ -181,6 +188,7 @@ def hft_headers():
         "Content-Type": "application/json",
     }
 
+
 # ======================================================================
 # NIFTY SPOT LTP & CANDLES
 # ======================================================================
@@ -200,6 +208,7 @@ def get_nifty_ltp():
     key = list(data_block.keys())[0]
     item = data_block[key]
     return item.get("last_price") or item.get("ltp")
+
 
 def get_nifty_intraday_candles(minutes_back: int):
     end_time = dt.datetime.now()
@@ -232,6 +241,7 @@ def get_nifty_intraday_candles(minutes_back: int):
         )
     return pd.DataFrame(rows)
 
+
 # ======================================================================
 # OPTION CONTRACTS, STRIKES & TREND
 # ======================================================================
@@ -248,6 +258,7 @@ def get_nifty_option_contracts(expiry_date=None, verbose=True):
     r.raise_for_status()
     j = r.json()
     return j.get("data", [])
+
 
 def build_strike_maps(contracts):
     df = pd.DataFrame(contracts)
@@ -301,6 +312,7 @@ def pick_instrument_for_trend(trend, spot, ce_map, pe_map):
         strike = strikes[0]
         return pe_map[strike], "PE", strike
 
+
 def info_from_instrument_key(contracts, instrument_key: str):
     """
     Given the full contracts list from get_nifty_option_contracts(),
@@ -315,6 +327,7 @@ def info_from_instrument_key(contracts, instrument_key: str):
                 "trading_symbol": c.get("trading_symbol"),
             }
     return None
+
 
 # ======================================================================
 # OPTION LTP & HFT ORDER HELPERS
@@ -372,7 +385,9 @@ def place_hft_limit_order(instrument_token, quantity, side, price):
     if PAPER:
         print("[PAPER] LIMIT:", payload)
         return f"PAPER-LMT-{side}-{int(time.time())}"
-    r = requests.post(f"{BASE_HFT}/order/place", headers=hft_headers(), json=payload)
+    r = requests.post(
+        f"{BASE_HFT}/order/place", headers=hft_headers(), json=payload
+    )
     print("LIMIT status:", r.status_code, r.text[:200])
     r.raise_for_status()
     return r.json()["data"]["order_id"]
@@ -395,16 +410,20 @@ def place_hft_sl_order(instrument_token, quantity, side, price, trigger_price):
     if PAPER:
         print("[PAPER] SL:", payload)
         return f"PAPER-SL-{side}-{int(time.time())}"
-    r = requests.post(f"{BASE_HFT}/order/place", headers=hft_headers(), json=payload)
+    r = requests.post(
+        f"{BASE_HFT}/order/place", headers=hft_headers(), json=payload
+    )
     print("SL status:", r.status_code, r.text[:200])
     r.raise_for_status()
     return r.json()["data"]["order_id"]
+
 
 # ======================================================================
 # POSITION CLASS & TRAILING LOGIC
 # ======================================================================
 open_positions = {}
 daily_pnl = 0.0
+
 
 class Position:
     def __init__(self, entry_oid, instrument_key, qty, entry_price):
@@ -419,16 +438,15 @@ class Position:
 
         # Place paper/live SL + TGT orders
         self.sl_oid = place_hft_sl_order(
-            instrument_key, qty, "SELL",
-            self.sl_price,
-            self.sl_price * 1.02
+            instrument_key, qty, "SELL", self.sl_price, self.sl_price * 1.02
         )
         self.tgt_oid = place_hft_limit_order(
-            instrument_key, qty, "SELL",
-            self.tgt_price
+            instrument_key, qty, "SELL", self.tgt_price
         )
 
-        print(f"Position: entry={entry_price:.2f}, SL={self.sl_price:.2f}, TGT={self.tgt_price:.2f}")
+        print(
+            f"Position: entry={entry_price:.2f}, SL={self.sl_price:.2f}, TGT={self.tgt_price:.2f}"
+        )
 
         # Log entry (paper or live) into CSVs (strike/type added in log_trade_row)
         row = [
@@ -441,7 +459,7 @@ class Position:
             round(self.sl_price, 2),
             round(self.tgt_price, 2),
             "ENTRY",
-            0.0,   # pnl
+            0.0,  # pnl
         ]
         log_trade_row(row)
 
@@ -496,16 +514,21 @@ def monitor_positions():
                 round(pos.sl_price, 2),
                 round(pos.tgt_price, 2),
                 r,
-                round(pnl, 2),            # pnl for this round-trip
+                round(pnl, 2),  # pnl for this round-trip
             ]
             log_trade_row(row)
 
             del open_positions[entry_oid]
     print("Monitor done; open positions:", len(open_positions))
 
+
 def dashboard():
     os.system("cls" if os.name == "nt" else "clear")
-    print("==========  NIFTY EMA520 SCALPER  –", "PAPER" if PAPER else "LIVE", "MODE  ==========")
+    print(
+        "==========  NIFTY EMA520 SCALPER  –",
+        "PAPER" if PAPER else "LIVE",
+        "MODE  ==========",
+    )
     print("Time   :", dt.datetime.now().strftime("%H:%M:%S"))
     print("Open   :", len(open_positions))
 
@@ -541,6 +564,7 @@ def dashboard():
     print(f"Daily P&L: {daily_pnl:.0f}")
     print("====================================================")
 
+
 # ======================================================================
 # ONE-SHOT ENTRY (run_once)
 # ======================================================================
@@ -563,7 +587,9 @@ def run_once():
     ce_map, pe_map, expiry = build_strike_maps(contracts)
     print("Using expiry:", expiry)
 
-    inst_key, opt_type, strike = pick_instrument_for_trend(trend, spot, ce_map, pe_map)
+    inst_key, opt_type, strike = pick_instrument_for_trend(
+        trend, spot, ce_map, pe_map
+    )
     if not inst_key:
         print("No option instrument selected.")
         return
@@ -578,6 +604,7 @@ def run_once():
 
     open_positions[entry_oid] = pos
     print("Trade placed with SL/TGT and logged.")
+
 
 # ======================================================================
 # AUTO LOOP
@@ -615,10 +642,13 @@ def auto_loop(
         if (now > end_time and not open_positions) or (
             trades_done >= max_trades_per_day and not open_positions
         ):
-            print("Stopping auto loop: time window over or max trades done, and no open positions.")
+            print(
+                "Stopping auto loop: time window over or max trades done, and no open positions."
+            )
             break
 
         time.sleep(monitor_interval_sec)
+
 
 # ======================================================================
 # MAIN

@@ -4,19 +4,18 @@
 100% Upstox Nifty 1min + Live Trading
 """
 
-import pandas as pd
-import numpy as np
-import time
 import argparse
-from pathlib import Path
-import sys
 import importlib.util
+import sys
+import time
 from datetime import datetime, timedelta
+from pathlib import Path
+
+import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).parent))
 
 try:
-    from env import UPSTOX_CLIENT_KEY, UPSTOX_CLIENT_SECRET
     print("✅ env.py loaded")
 except ImportError:
     print("❌ env.py missing")
@@ -25,7 +24,7 @@ except ImportError:
 TOKEN_FILE = "upstox_access_token.txt"
 
 import upstox_client
-from upstox_client import Configuration, ApiClient
+from upstox_client import ApiClient, Configuration
 
 STRATEGY_LIST = ["ema_crossover"]
 
@@ -52,7 +51,9 @@ class PaperTrader:
         nifty_key = "NSE_INDEX|Nifty 50"
         history_api = upstox_client.api.HistoryApi(self.api_client)
 
-        from_date = (datetime.now() - timedelta(days=days_back)).strftime("%Y-%m-%d")
+        from_date = (datetime.now() - timedelta(days=days_back)).strftime(
+            "%Y-%m-%d"
+        )
         candles_response = history_api.get_historical_candle_data(
             nifty_key, "1minute", from_date, "v2"
         )
@@ -61,20 +62,35 @@ class PaperTrader:
         if len(candle_data[0]) == 7:
             df = pd.DataFrame(
                 candle_data,
-                columns=["timestamp", "open", "high", "low", "close", "volume", "oi"],
-            )[
-                ["timestamp", "open", "high", "low", "close", "volume"]
-            ]
+                columns=[
+                    "timestamp",
+                    "open",
+                    "high",
+                    "low",
+                    "close",
+                    "volume",
+                    "oi",
+                ],
+            )[["timestamp", "open", "high", "low", "close", "volume"]]
         else:
             df = pd.DataFrame(
                 candle_data,
-                columns=["timestamp", "open", "high", "low", "close", "volume"],
+                columns=[
+                    "timestamp",
+                    "open",
+                    "high",
+                    "low",
+                    "close",
+                    "volume",
+                ],
             )
 
         df["timestamp"] = pd.to_datetime(df["timestamp"], errors="coerce")
         df.set_index("timestamp", inplace=True)
         df.columns = ["Open", "High", "Low", "Close", "Volume"]
-        df["Volume"] = pd.to_numeric(df["Volume"], errors="coerce").fillna(1000)
+        df["Volume"] = pd.to_numeric(df["Volume"], errors="coerce").fillna(
+            1000
+        )
 
         self.last_nifty_price = float(df["Close"].iloc[-1])
         return df.dropna()
@@ -111,7 +127,9 @@ class PaperTrader:
             print(f"⚠️  Create: {strategy_path}")
             return
 
-        spec = importlib.util.spec_from_file_location("strategy", strategy_path)
+        spec = importlib.util.spec_from_file_location(
+            "strategy", strategy_path
+        )
         module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)
 
@@ -172,7 +190,7 @@ def main():
     sells = [t for t in trader.trades_log if t["action"] == "SELL"]
     total_pnl = sum(t.get("pnl", 0) for t in sells)
     print(f"\n{'='*60}")
-    print(f"💎 FINAL RESULTS")
+    print("💎 FINAL RESULTS")
     print(f"📊 Total Trades: {len(trader.trades_log)}")
     print(f"💰 Closed Trades: {len(sells)}")
     print(f"💵 Total P&L: ₹{total_pnl:+.0f}")

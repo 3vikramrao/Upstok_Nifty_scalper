@@ -30,8 +30,8 @@ def ensemble_signal(df, strategies=STRATEGIES):
         try:
             strat_func = load_strategy(name)
             temp_df = strat_func(df.copy())
-            all_long_signals |= temp_df['Long_Signal']
-            all_short_signals |= temp_df['Short_Signal']
+            all_long_signals |= temp_df["Long_Signal"]
+            all_short_signals |= temp_df["Short_Signal"]
             print(
                 f"  ✅ {name}: {temp_df['Long_Signal'].sum()}L "
                 f"{temp_df['Short_Signal'].sum()}S"
@@ -39,8 +39,8 @@ def ensemble_signal(df, strategies=STRATEGIES):
         except Exception as e:
             print(f"  ❌ {name}: {e}")
 
-    df['Long_Signal'] = all_long_signals
-    df['Short_Signal'] = all_short_signals
+    df["Long_Signal"] = all_long_signals
+    df["Short_Signal"] = all_short_signals
 
     print(
         f"✅ MultiBot: {all_long_signals.sum()}L "
@@ -56,8 +56,7 @@ def run_strategy(nifty):
 
     if isinstance(nifty.columns, pd.MultiIndex):
         nifty.columns = [
-            col[0] if isinstance(col, tuple) else col
-            for col in nifty.columns
+            col[0] if isinstance(col, tuple) else col for col in nifty.columns
         ]
 
     nifty = ensemble_signal(nifty, STRATEGIES)

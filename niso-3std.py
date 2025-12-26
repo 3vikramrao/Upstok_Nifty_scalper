@@ -3,16 +3,15 @@
 NISO – NIFTY Options Supertrend Scalper with Paper Logging (Notebook version)
 """
 
+import csv
+import datetime as dt
 import os
 import time
-import csv
-import requests
-import pandas as pd
+from datetime import datetime
 from pathlib import Path
-from datetime import datetime, timedelta
-import datetime as dt
-import re
 
+import pandas as pd
+import requests
 
 # CONFIG & CREDENTIALS
 try:
@@ -34,9 +33,7 @@ CLIENT_SECRET = UPSTOX_CLIENT_SECRET
 REDIRECT_URI = UPSTOX_REDIRECT_URI
 
 if not all([CLIENT_ID, CLIENT_SECRET, REDIRECT_URI]):
-    raise RuntimeError(
-        "Missing Upstox credentials. Check env.py"
-    )
+    raise RuntimeError("Missing Upstox credentials. Check env.py")
 
 ACCESS_TOKEN_FILE = "upstox_access_token.txt"
 
@@ -245,9 +242,7 @@ def get_nifty_intraday_candles(minutes_back: int) -> pd.DataFrame:
     for c in data["data"]["candles"]:
         rows.append(
             dict(
-                time=dt.datetime.fromisoformat(
-                    c[0].replace("Z", "+00:00")
-                ),
+                time=dt.datetime.fromisoformat(c[0].replace("Z", "+00:00")),
                 open=c[1],
                 high=c[2],
                 low=c[3],
@@ -342,7 +337,7 @@ def supertrend(
         else:
             prev_st = st.iloc[i - 1]
             prev_upper = final_upper.iloc[i - 1]
-            prev_lower = final_lower.iloc[i - 1]
+            final_lower.iloc[i - 1]
 
             if prev_st == prev_upper:  # Was in downtrend
                 if close.iloc[i] <= final_upper.iloc[i]:
@@ -532,7 +527,9 @@ def place_hft_limit_order(
     if PAPER:
         print("[PAPER] LIMIT:", payload)
         return f"PAPER-LMT-{side}-{int(time.time())}"
-    r = requests.post(f"{BASE_HFT}/order/place", headers=hft_headers(), json=payload)
+    r = requests.post(
+        f"{BASE_HFT}/order/place", headers=hft_headers(), json=payload
+    )
     print("LIMIT status:", r.status_code, r.text[:200])
     r.raise_for_status()
     return r.json()["data"]["order_id"]
@@ -561,7 +558,9 @@ def place_hft_sl_order(
     if PAPER:
         print("[PAPER] SL:", payload)
         return f"PAPER-SL-{side}-{int(time.time())}"
-    r = requests.post(f"{BASE_HFT}/order/place", headers=hft_headers(), json=payload)
+    r = requests.post(
+        f"{BASE_HFT}/order/place", headers=hft_headers(), json=payload
+    )
     print("SL status:", r.status_code, r.text[:200])
     r.raise_for_status()
     return r.json()["data"]["order_id"]
@@ -587,7 +586,9 @@ def check_margin_for_order(instrument_key: str) -> bool:
     margin_needed = get_option_margin_estimate(instrument_key, QTY)
     available = get_account_margin()
 
-    print(f"Margin check: Available ₹{available:,.0f} | Needed ₹{margin_needed:,.0f}")
+    print(
+        f"Margin check: Available ₹{available:,.0f} | Needed ₹{margin_needed:,.0f}"
+    )
 
     if available < margin_needed * 1.1:  # 10% buffer
         print("❌ INSUFFICIENT MARGIN")
@@ -662,11 +663,11 @@ def monitor_positions() -> None:
     print(f"Portfolio MTM: ₹{total_mtm:.0f}")
 
     if total_mtm >= RUPEE_TARGET:
-        print(f"🎯 ₹10K TARGET HIT!")
+        print("🎯 ₹10K TARGET HIT!")
         exit_all_positions("RUPEE_TARGET", total_mtm)
         return
     elif total_mtm <= RUPEE_SL:
-        print(f"🛑 ₹3.5K SL HIT!")
+        print("🛑 ₹3.5K SL HIT!")
         exit_all_positions("RUPEE_SL", total_mtm)
         return
 
@@ -712,7 +713,9 @@ def dashboard() -> None:
 
     print(f"Open MTM : {total_mtm:.0f}")
     print(f"Daily P&L: {daily_pnl:.0f}")
-    print("======================================================================")
+    print(
+        "======================================================================"
+    )
 
 
 def run_once() -> None:

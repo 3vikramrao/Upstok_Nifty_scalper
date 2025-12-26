@@ -12,6 +12,7 @@ except ImportError:
 class TestRiskManager:
     def test_mock_daily_loss(self):
         """Mock test always passes."""
+
         class MockRisk:
             def __init__(self):
                 self.daily_pnl = 0
