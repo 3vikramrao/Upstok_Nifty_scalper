@@ -48,4 +48,5 @@ def get_access_token():
     if not os.path.exists(ACCESS_TOKEN_FILE):
         raise RuntimeError("Run Upstox auth script to create upstox_access_token.txt")
     with open(ACCESS_TOKEN_FILE, "r", encoding="utf-8") as f:
-        token = f.read().strip()
+        return f.read().strip()
+
