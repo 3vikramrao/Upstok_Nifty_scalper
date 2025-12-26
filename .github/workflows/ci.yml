@@ -1,0 +1,26 @@
+﻿name: CI/CD Lint & Test
+on: [push, pull_request]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+    
+    - name: Install tools
+      run: |
+        pip install black ruff flake8 pytest
+    
+    - name: Black
+      run: black --check . --line-length 88
+    
+    - name: Ruff
+      run: ruff check . --line-length 88
+    
+    - name: Flake8
+      run: flake8 . --max-line-length=88 --extend-ignore=E501,F824
