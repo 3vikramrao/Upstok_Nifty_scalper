@@ -23,4 +23,10 @@ class TestRiskManager:
         rm.daily_pnl = -4000
         assert rm.can_trade()
 
-    @pytest.mark.skipif(not HAS_RISK_MANAGER, reason
+    @pytest.mark.skipif(
+        not HAS_RISK_MANAGER, reason="risk_manager.py not available"
+    )
+    def test_real_risk_manager(self):
+        """Test actual RiskManager when available."""
+        rm = RiskManager()
+        assert hasattr(rm, "can_trade")
